@@ -81,17 +81,17 @@
         background: #e0f2fe;
         color: #0284c7;
       }
-      .badge-public {
-        background: #f3f4f6;
-        color: #4b5563;
-      }
-
-      code {
-        background: #f1f5f9;
-        padding: 0.2rem 0.4rem;
-        border-radius: 4px;
-        color: #ef4444;
-        font-size: 0.9em;
+      .step-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background: var(--vds-forest);
+        color: white;
+        border-radius: 50%;
+        font-weight: bold;
+        margin-right: 10px;
       }
     </style>
   </head>
@@ -100,16 +100,16 @@
     <nav class="sidebar">
       <div class="mb-5">
         <img src="assets/logo2.png" alt="KLD Logo" height="40" class="mb-3" />
-        <h5 class="fw-bold">System Walkthrough</h5>
-        <p class="text-muted small">KLD GradeVault Documentation</p>
+        <h5 class="fw-bold">GradeVault Guide</h5>
+        <p class="text-muted small">System Walkthrough & User Journey</p>
       </div>
 
       <div class="nav flex-column">
         <a href="#overview" class="nav-link active">Overview</a>
-        <a href="#public-zone" class="nav-link">Public Zone</a>
-        <a href="#admin-zone" class="nav-link">Admin Zone</a>
-        <a href="#teacher-zone" class="nav-link">Teacher Zone</a>
-        <a href="#student-zone" class="nav-link">Student Zone</a>
+        <a href="#phase1" class="nav-link">Phase 1: The Setup</a>
+        <a href="#phase2" class="nav-link">Phase 2: Student Exp.</a>
+        <a href="#phase3" class="nav-link">Phase 3: Grading Day</a>
+        <a href="#tech-stack" class="nav-link">Technical Stack</a>
       </div>
     </nav>
 
@@ -119,185 +119,201 @@
       <section id="overview" class="mb-5">
         <h1 class="section-title">System Overview</h1>
         <p class="lead mb-4">
-          The KLD GradeVault system is architected into two distinct zones: a
-          <strong>Public Zone</strong> for entry and verification, and a secure
-          <strong>Private Zone</strong> tailored to specific permissions.
+          <strong>KLD GradeVault</strong> streamlines the grading process for a
+          multi-institute college by digitizing grade submission, verification,
+          and distribution.
         </p>
 
         <div class="row g-4">
-          <div class="col-md-6">
+          <div class="col-md-4">
             <div class="feature-card h-100">
-              <h3 class="h4 mb-3">Public Zone</h3>
+              <h3 class="h4 mb-3">Hierarchy-Aware</h3>
               <p class="text-muted">
-                Accessible to anyone. Serves as the secure gateway for
-                authentication and registration.
+                Respects organizational structure. Institute Heads only manage
+                their own faculty.
               </p>
             </div>
           </div>
-          <div class="col-md-6">
+          <div class="col-md-4">
             <div class="feature-card h-100">
-              <h3 class="h4 mb-3">Private Zone</h3>
+              <h3 class="h4 mb-3">Hybrid Enrollment</h3>
               <p class="text-muted">
-                Restricted access based on roles: Admin, Teacher, and Student.
-                Contains the core functionality.
+                Students join via "Class Codes" or are
+                <strong>Auto-Enrolled</strong> when a teacher uploads a grade
+                sheet.
+              </p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="feature-card h-100">
+              <h3 class="h4 mb-3">Data Integrity</h3>
+              <p class="text-muted">
+                Grades are calculated automatically (Raw Score $\to$ Transmuted
+                Grade) to prevent errors.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- Public Zone -->
-      <section id="public-zone" class="mb-5 pt-5">
-        <h2 class="section-title">Public Zone</h2>
+      <!-- Phase 1: The Setup -->
+      <section id="phase1" class="mb-5 pt-5">
+        <h2 class="section-title">Phase 1: The Setup (Admin & Teacher)</h2>
 
         <div class="feature-card">
-          <span class="role-badge badge-public">Public</span>
-          <h3 class="h4">Login Portal</h3>
-          <p class="text-muted mb-2">File: <code>login.php</code></p>
-          <p>
-            The gatekeeper of the system. Authenticates credentials and routes
-            users to their specific dashboards. Blocks unverified or unapproved
-            accounts.
-          </p>
-        </div>
-
-        <div class="feature-card">
-          <span class="role-badge badge-public">Public</span>
-          <h3 class="h4">Registration Page</h3>
+          <span class="role-badge badge-teacher"
+            >Step 1: Teacher Registration</span
+          >
+          <h3 class="h4">Account Creation</h3>
           <p class="text-muted mb-2">File: <code>register.php</code></p>
           <p>
-            Smart form with dynamic dropdowns. Enforces security by requiring
-            institutional emails and OTP verification. Teachers are placed in a
-            "pending" state upon registration.
+            <span class="step-number">1</span> User registers with an
+            institutional email (<code>@kld.edu.ph</code>).<br />
+            <span class="step-number">2</span> Selects Institute (e.g.,
+            "Institute of Nursing") and Role ("Teacher").<br />
+            <span class="step-number">3</span> System sets status to
+            <strong>Pending Approval</strong>.
           </p>
         </div>
 
         <div class="feature-card">
-          <span class="role-badge badge-public">Public</span>
-          <h3 class="h4">Account Recovery</h3>
-          <p class="text-muted mb-2">File: <code>forgot_password.php</code></p>
-          <p>
-            Allows users to securely reset their credentials via email link.
-          </p>
-        </div>
-      </section>
-
-      <!-- Admin Zone -->
-      <section id="admin-zone" class="mb-5 pt-5">
-        <h2 class="section-title">Admin Zone (Institute Head)</h2>
-
-        <div class="feature-card">
-          <span class="role-badge badge-admin">Admin</span>
-          <h3 class="h4">Admin Dashboard</h3>
-          <p class="text-muted mb-2">File: <code>admin_dashboard.php</code></p>
-          <p>
-            High-level view of the institute's health. Provides quick access to
-            management tools and system stats.
-          </p>
-        </div>
-
-        <div class="feature-card">
-          <span class="role-badge badge-admin">Admin</span>
-          <h3 class="h4">Faculty Management</h3>
+          <span class="role-badge badge-admin">Step 2: Admin Approval</span>
+          <h3 class="h4">Faculty Verification</h3>
           <p class="text-muted mb-2">File: <code>admin_faculty.php</code></p>
           <p>
-            Critical workflow for approving teacher accounts. Admins must
-            explicitly "Approve" pending teachers before they can access the
-            system.
+            <span class="step-number">1</span> Institute Head logs in and sees
+            "Pending Approvals".<br />
+            <span class="step-number">2</span> Reviews details and clicks
+            <strong>[Approve]</strong>.<br />
+            <span class="step-number">3</span> Teacher account becomes Active.
           </p>
         </div>
 
         <div class="feature-card">
-          <span class="role-badge badge-admin">Admin</span>
-          <h3 class="h4">Student Registry</h3>
-          <p class="text-muted mb-2">File: <code>admin_students.php</code></p>
+          <span class="role-badge badge-teacher">Step 3: Creating a Class</span>
+          <h3 class="h4">Class Management</h3>
+          <p class="text-muted mb-2">File: <code>my_classes.php</code></p>
           <p>
-            Manage student enrollment statuses and view student lists within the
-            institute.
-          </p>
-        </div>
-
-        <div class="feature-card">
-          <span class="role-badge badge-admin">Admin</span>
-          <h3 class="h4">Institute Settings</h3>
-          <p class="text-muted mb-2">File: <code>admin_settings.php</code></p>
-          <p>
-            Configure global variables like academic years, semesters, and
-            system maintenance switches.
+            <span class="step-number">1</span> Teacher logs in and clicks
+            "Create Class".<br />
+            <span class="step-number">2</span> Inputs Subject (e.g., ANAT101),
+            Section, and Semester.<br />
+            <span class="step-number">3</span> System generates a unique
+            <strong>Class Code</strong> (e.g., G7K-9L2).
           </p>
         </div>
       </section>
 
-      <!-- Teacher Zone -->
-      <section id="teacher-zone" class="mb-5 pt-5">
-        <h2 class="section-title">Teacher Zone (Faculty)</h2>
+      <!-- Phase 2: Student Experience -->
+      <section id="phase2" class="mb-5 pt-5">
+        <h2 class="section-title">Phase 2: The Student Experience</h2>
 
         <div class="feature-card">
-          <span class="role-badge badge-teacher">Teacher</span>
-          <h3 class="h4">Teacher Dashboard</h3>
-          <p class="text-muted mb-2">
-            File: <code>teacher_dashboard.php</code>
-          </p>
+          <span class="role-badge badge-student"
+            >Step 4: Student Registration</span
+          >
+          <h3 class="h4">Instant Access</h3>
+          <p class="text-muted mb-2">File: <code>register.php</code></p>
           <p>
-            Central hub for teachers. Lists assigned subjects and provides
-            access to grading tools.
+            Students register with their school email. Unlike teachers, they get
+            <strong>Instant Access</strong> without admin approval.
           </p>
         </div>
 
         <div class="feature-card">
-          <span class="role-badge badge-teacher">Teacher</span>
-          <h3 class="h4">Grade Import</h3>
+          <span class="role-badge badge-student">Step 5: Joining a Class</span>
+          <h3 class="h4">Enrollment</h3>
+          <p class="text-muted mb-2">File: <code>student_classes.php</code></p>
+          <p>
+            <span class="step-number">1</span> Student logs in and clicks "Join
+            Class".<br />
+            <span class="step-number">2</span> Enters the 6-digit
+            <strong>Class Code</strong> provided by the teacher.<br />
+            <span class="step-number">3</span> The subject now appears on their
+            dashboard.
+          </p>
+        </div>
+      </section>
+
+      <!-- Phase 3: Grading Day -->
+      <section id="phase3" class="mb-5 pt-5">
+        <h2 class="section-title">Phase 3: Grading Day</h2>
+
+        <div class="feature-card">
+          <span class="role-badge badge-teacher">Step 6: Uploading Grades</span>
+          <h3 class="h4">Excel Import & Transmutation</h3>
           <p class="text-muted mb-2">File: <code>grade_upload.php</code></p>
           <p>
-            Drag-and-drop interface for Excel files. Parses files instantly,
-            validates Student IDs, and allows data preview before committing.
+            <span class="step-number">1</span> Teacher selects a class and
+            uploads an Excel file with
+            <strong>Raw Grades</strong> (0-100).<br />
+            <span class="step-number">2</span>
+            <strong>Auto-Calculation</strong>: System converts Raw Grades to
+            Transmuted Grades (e.g., 95 $\to$ 1.25).<br />
+            <span class="step-number">3</span> <strong>Auto-Enrollment</strong>:
+            If a student in the file is not in the class, the system
+            automatically enrolls them ("Ghost Student Fix").
           </p>
+          <div class="alert alert-info mt-3">
+            <strong>Transmutation Logic:</strong><br />
+            97-100 $\to$ 1.00 | 94-96 $\to$ 1.25 | ... | < 75 $\to$ 5.00
+            (Failed)
+          </div>
         </div>
 
         <div class="feature-card">
-          <span class="role-badge badge-teacher">Teacher</span>
-          <h3 class="h4">Class Records</h3>
-          <p class="text-muted mb-2">File: <code>teacher_records.php</code></p>
+          <span class="role-badge badge-student">Step 7: Viewing Results</span>
+          <h3 class="h4">Grade Monitoring</h3>
+          <p class="text-muted mb-2">File: <code>student_history.php</code></p>
           <p>
-            Digital ledger for manual grade management. Search for specific
-            students and edit or delete grade entries.
+            Student logs in to see their new grades. They can view a detailed
+            history grouped by semester and download an official grade report.
           </p>
         </div>
       </section>
 
-      <!-- Student Zone -->
-      <section id="student-zone" class="mb-5 pt-5">
-        <h2 class="section-title">Student Zone</h2>
-
-        <div class="feature-card">
-          <span class="role-badge badge-student">Student</span>
-          <h3 class="h4">Student Dashboard</h3>
-          <p class="text-muted mb-2">
-            File: <code>student_dashboard.php</code>
-          </p>
-          <p>
-            Real-time report card. Displays recent grades, GPA, and visual
-            indicators for pass/fail status.
-          </p>
-        </div>
-
-        <div class="feature-card">
-          <span class="role-badge badge-student">Student</span>
-          <h3 class="h4">Academic History</h3>
-          <p class="text-muted mb-2">File: <code>student_history.php</code></p>
-          <p>
-            Transcript-style timeline of grades across all years and semesters.
-          </p>
-        </div>
-
-        <div class="feature-card">
-          <span class="role-badge badge-student">Student</span>
-          <h3 class="h4">Print Preview</h3>
-          <p class="text-muted mb-2">File: <code>print_grades.php</code></p>
-          <p>
-            Formats current grades into a branded, official PDF layout suitable
-            for printing.
-          </p>
+      <!-- Technical Stack -->
+      <section id="tech-stack" class="mb-5 pt-5">
+        <h2 class="section-title">Technical Stack</h2>
+        <div class="row g-4">
+          <div class="col-md-6">
+            <div class="feature-card h-100">
+              <h3 class="h4">Frontend</h3>
+              <ul class="list-unstyled text-muted">
+                <li>
+                  <i class="bi bi-check-circle-fill text-success me-2"></i
+                  ><strong>Bootstrap 5</strong>: Responsive UI
+                </li>
+                <li>
+                  <i class="bi bi-check-circle-fill text-success me-2"></i
+                  ><strong>SheetJS</strong>: Excel parsing in browser
+                </li>
+                <li>
+                  <i class="bi bi-check-circle-fill text-success me-2"></i
+                  ><strong>Verdant Design System</strong>: Custom CSS
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="feature-card h-100">
+              <h3 class="h4">Backend</h3>
+              <ul class="list-unstyled text-muted">
+                <li>
+                  <i class="bi bi-check-circle-fill text-success me-2"></i
+                  ><strong>PHP 8+</strong>: Core logic
+                </li>
+                <li>
+                  <i class="bi bi-check-circle-fill text-success me-2"></i
+                  ><strong>MySQL</strong>: Relational database
+                </li>
+                <li>
+                  <i class="bi bi-check-circle-fill text-success me-2"></i
+                  ><strong>RBAC</strong>: Role-Based Access Control
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
       </section>
     </main>

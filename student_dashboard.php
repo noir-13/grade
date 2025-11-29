@@ -10,6 +10,10 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'student') {
 $user_id = $_SESSION['user_id'];
 $full_name = $_SESSION['full_name'];
 
+// Check Profile Completion
+require 'check_profile.php';
+
+
 // Fetch Grades
 $stmt = $conn->prepare("SELECT * FROM grades WHERE student_id = ? ORDER BY created_at DESC");
 $stmt->bind_param("i", $user_id);

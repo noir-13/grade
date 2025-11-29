@@ -6,6 +6,19 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
     header("Location: login.php");
     exit();
 }
+
+$teacher_id = $_SESSION['user_id'];
+$class_id_param = isset($_GET['class_id']) ? intval($_GET['class_id']) : 0;
+
+// Fetch all classes for this teacher
+$classes = [];
+$stmt = $conn->prepare("SELECT * FROM classes WHERE teacher_id = ? ORDER BY created_at DESC");
+$stmt->bind_param("i", $teacher_id);
+$stmt->execute();
+$result = $stmt->get_result();
+while ($row = $result->fetch_assoc()) {
+    $classes[] = $row;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -27,9 +40,25 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
             transition: all 0.3s ease;
             cursor: pointer;
         }
-        .vds-file-drop:hover {
+        .vds-file-drop:hover, .vds-file-drop.drag-over {
             border-color: var(--vds-forest);
             background: rgba(13, 59, 46, 0.05);
+        }
+        .validation-icon {
+            font-size: 1.2rem;
+        }
+        .row-valid { background: rgba(34, 197, 94, 0.1); }
+        .row-invalid { background: rgba(239, 68, 68, 0.1); }
+        .row-duplicate { background: rgba(251, 191, 36, 0.1); }
+        .editable-cell {
+            border-bottom: 1px dashed var(--vds-sage);
+            cursor: text;
+            transition: background 0.2s;
+        }
+        .editable-cell:hover, .editable-cell:focus {
+            background: rgba(255, 255, 255, 0.8);
+            outline: none;
+            border-bottom: 1px solid var(--vds-forest);
         }
     </style>
 </head>
@@ -42,14 +71,49 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
             <div>
                 <a href="teacher_dashboard.php" class="vds-text-muted text-decoration-none mb-2 d-inline-block"><i class="bi bi-arrow-left me-1"></i> Back to Dashboard</a>
                 <h1 class="vds-h2">Upload Grades</h1>
-                <p class="vds-text-muted">Import grades via Excel file.</p>
+                <p class="vds-text-muted">Import grades via Excel file for fast data encoding.</p>
             </div>
         </div>
 
-        <div class="vds-card p-5 mb-5">
+        <!-- Step 1: Select Class -->
+        <div class="vds-card p-4 mb-4">
+            <h2 class="vds-h3 mb-3"><i class="bi bi-info-circle me-2"></i>Step 1: Select Class</h2>
+            <div class="row g-3">
+                <div class="col-md-12">
+                    <label class="vds-label">Select Class to Upload Grades For <span class="text-danger">*</span></label>
+                    <select id="classSelect" class="vds-input">
+                        <option value="">-- Select a Class --</option>
+                        <?php foreach ($classes as $class): ?>
+                            <option value="<?php echo $class['id']; ?>" 
+                                data-section="<?php echo htmlspecialchars($class['section']); ?>"
+                                data-subject-code="<?php echo htmlspecialchars($class['subject_code']); ?>"
+                                data-subject-name="<?php echo htmlspecialchars($class['subject_description']); ?>"
+                                data-semester="<?php echo htmlspecialchars($class['semester']); ?>"
+                                data-units="<?php echo htmlspecialchars($class['units'] ?? 3); ?>"
+                                <?php echo ($class_id_param == $class['id']) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($class['subject_description'] . ' (' . $class['subject_code'] . ') - ' . $class['section']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <small class="text-muted">Only classes you have created are shown here.</small>
+                </div>
+            </div>
+            
+            <!-- Hidden Fields for Compatibility -->
+            <input type="hidden" id="section">
+            <input type="hidden" id="subjectCode">
+            <input type="hidden" id="subjectName">
+            <input type="hidden" id="semester">
+        </div>
+
+        <!-- Step 2: Upload Excel File -->
+        <div class="vds-card p-5 mb-4" id="uploadStep" style="opacity: 0.5; pointer-events: none;">
             <div class="text-center mb-4">
-                <h2 class="vds-h2">Drag & Drop Upload</h2>
-                <p class="vds-text-muted">Upload an Excel file (.xlsx) with columns: <strong>Student ID</strong>, <strong>Subject Code</strong>, <strong>Grade</strong>, <strong>Remarks</strong>.</p>
+                <h2 class="vds-h3"><i class="bi bi-cloud-arrow-up me-2"></i>Step 2: Upload Excel File</h2>
+                <p class="vds-text-muted">Upload an Excel file (.xlsx) with columns: <strong>Student ID</strong>, <strong>Grade</strong>, <strong>Remarks (optional)</strong></p>
+                <button id="downloadTemplate" class="vds-btn vds-btn-secondary btn-sm mt-2">
+                    <i class="bi bi-download me-1"></i>Download Template
+                </button>
             </div>
             
             <div class="vds-file-drop" id="dropZone">
@@ -58,30 +122,51 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
                 <p class="vds-text-muted">or click to browse</p>
                 <input type="file" id="fileInput" hidden accept=".xlsx, .xls">
             </div>
+        </div>
 
-            <!-- Preview Area -->
-            <div id="previewContainer" style="display: none;" class="mt-5">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3 class="vds-h3">Preview Data</h3>
-                    <button id="publishBtn" class="vds-btn vds-btn-primary">
+        <!-- Step 3: Preview & Validate -->
+        <div id="previewContainer" style="display: none;" class="vds-card p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h3 class="vds-h3 mb-1"><i class="bi bi-table me-2"></i>Step 3: Preview & Validate</h3>
+                    <p class="vds-text-muted mb-0" id="previewSummary">Review your data before uploading</p>
+                </div>
+                <div>
+                    <button id="validateBtn" class="vds-btn vds-btn-secondary me-2">
+                        <i class="bi bi-shield-check me-1"></i>Validate Students
+                    </button>
+                    <button id="publishBtn" class="vds-btn vds-btn-primary" disabled>
                         <i class="bi bi-check-circle me-2"></i>Publish Grades
                     </button>
                 </div>
-                <div class="table-responsive">
-                    <table class="vds-table" id="previewTable">
-                        <thead>
-                            <tr>
-                                <th>Student ID</th>
-                                <th>Subject Code</th>
-                                <th>Grade</th>
-                                <th>Remarks</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- JS will populate this -->
-                        </tbody>
-                    </table>
+            </div>
+
+            <div class="alert alert-info d-flex align-items-center mb-3">
+                <i class="bi bi-info-circle me-2"></i>
+                <div>
+                    <strong>Legend:</strong>
+                    <span class="ms-3"><i class="bi bi-check-circle-fill text-success"></i> Valid</span>
+                    <span class="ms-3"><i class="bi bi-exclamation-circle-fill text-danger"></i> Not Found</span>
+                    <span class="ms-3"><i class="bi bi-person-x-fill text-danger"></i> Not Enrolled</span>
                 </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="vds-table" id="previewTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">#</th>
+                            <th style="width: 60px;">Status</th>
+                            <th>Student ID</th>
+                            <th>Student Name</th>
+                            <th>Grade</th>
+                            <th>Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- JS will populate this -->
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -89,31 +174,97 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
     <?php include 'footer_dashboard.php'; ?>
 
     <script>
+        const classSelect = document.getElementById('classSelect');
+        const uploadStep = document.getElementById('uploadStep');
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
         const previewContainer = document.getElementById('previewContainer');
         const previewTableBody = document.querySelector('#previewTable tbody');
         const publishBtn = document.getElementById('publishBtn');
+        const validateBtn = document.getElementById('validateBtn');
+        const downloadTemplateBtn = document.getElementById('downloadTemplate');
+        const previewSummary = document.getElementById('previewSummary');
+        
+        // Hidden fields
+        const sectionInput = document.getElementById('section');
+        const subjectCodeInput = document.getElementById('subjectCode');
+        const subjectNameInput = document.getElementById('subjectName');
+        const semesterInput = document.getElementById('semester');
+
         let parsedData = [];
+        let validationResults = {};
+        let currentClassId = 0;
+
+        // Transmutation Logic (Matches PHP)
+        function transmuteGrade(raw) {
+            raw = parseFloat(raw);
+            if (isNaN(raw)) return ['-', ''];
+            if (raw >= 97) return ['1.00', 'Passed'];
+            if (raw >= 94) return ['1.25', 'Passed'];
+            if (raw >= 91) return ['1.50', 'Passed'];
+            if (raw >= 88) return ['1.75', 'Passed'];
+            if (raw >= 85) return ['2.00', 'Passed'];
+            if (raw >= 82) return ['2.25', 'Passed'];
+            if (raw >= 79) return ['2.50', 'Passed'];
+            if (raw >= 76) return ['2.75', 'Passed'];
+            if (raw >= 75) return ['3.00', 'Passed'];
+            return ['5.00', 'Failed'];
+        }
+
+        // Initialize state based on selection
+        function updateClassState() {
+            const selectedOption = classSelect.options[classSelect.selectedIndex];
+            if (selectedOption.value) {
+                currentClassId = selectedOption.value;
+                sectionInput.value = selectedOption.dataset.section;
+                subjectCodeInput.value = selectedOption.dataset.subjectCode;
+                subjectNameInput.value = selectedOption.dataset.subjectName;
+                semesterInput.value = selectedOption.dataset.semester;
+                
+                uploadStep.style.opacity = '1';
+                uploadStep.style.pointerEvents = 'auto';
+            } else {
+                currentClassId = 0;
+                uploadStep.style.opacity = '0.5';
+                uploadStep.style.pointerEvents = 'none';
+                previewContainer.style.display = 'none';
+            }
+        }
+
+        classSelect.addEventListener('change', updateClassState);
+        
+        // Run on load to handle pre-selection
+        updateClassState();
+
+        // Download Template
+        downloadTemplateBtn.addEventListener('click', () => {
+            const wb = XLSX.utils.book_new();
+            const wsData = [
+                ['Student ID', 'Raw Grade', 'Notes'],
+                ['2024-2-000550', '98', 'Excellent work'],
+                ['2024-2-000551', '85', ''],
+                ['2024-2-000552', '74', 'Needs improvement']
+            ];
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            XLSX.utils.book_append_sheet(wb, ws, "Template");
+            XLSX.writeFile(wb, "grade_upload_template.xlsx");
+        });
 
         // Drag & Drop Events
         dropZone.addEventListener('click', () => fileInput.click());
         
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
-            dropZone.style.borderColor = 'var(--vds-forest)';
-            dropZone.style.background = 'rgba(13, 59, 46, 0.05)';
+            dropZone.classList.add('drag-over');
         });
 
         dropZone.addEventListener('dragleave', () => {
-            dropZone.style.borderColor = 'var(--vds-sage)';
-            dropZone.style.background = 'rgba(255,255,255,0.5)';
+            dropZone.classList.remove('drag-over');
         });
 
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
-            dropZone.style.borderColor = 'var(--vds-sage)';
-            dropZone.style.background = 'rgba(255,255,255,0.5)';
+            dropZone.classList.remove('drag-over');
             const files = e.dataTransfer.files;
             if (files.length) handleFile(files[0]);
         });
@@ -130,61 +281,261 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 parsedData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
                 
-                // Remove header row if it exists and matches expected format
-                const headers = parsedData[0];
-                parsedData = parsedData.slice(1); // Remove header
+                // Remove header row if it exists
+                if (parsedData.length > 0) {
+                    parsedData = parsedData.slice(1);
+                }
 
                 renderPreview(parsedData);
+                previewContainer.style.display = 'block';
             };
             reader.readAsArrayBuffer(file);
         }
 
         function renderPreview(data) {
             previewTableBody.innerHTML = '';
-            const displayData = data.slice(0, 10); 
+            validationResults = {};
+            publishBtn.disabled = true;
             
-            displayData.forEach(row => {
-                if (row.length >= 3) {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${row[0] || ''}</td>
-                        <td>${row[1] || ''}</td>
-                        <td><span class="vds-pill vds-pill-pass">${row[2] || ''}</span></td>
-                        <td>${row[3] || ''}</td>
-                    `;
-                    previewTableBody.appendChild(tr);
-                }
+            // Update Table Header
+            const thead = document.querySelector('#previewTable thead tr');
+            thead.innerHTML = `
+                <th style="width: 50px;">#</th>
+                <th style="width: 60px;">Status</th>
+                <th>Student ID <i class="bi bi-pencil-square small text-muted ms-1"></i></th>
+                <th>Student Name</th>
+                <th>Units</th>
+                <th>Raw Grade <i class="bi bi-pencil-square small text-muted ms-1"></i></th>
+                <th>Transmuted</th>
+                <th>Remarks</th>
+            `;
+            
+            const units = classSelect.options[classSelect.selectedIndex].dataset.units || 3;
+
+            data.forEach((row, index) => {
+                // Ensure row has at least 3 elements
+                if (!row[0]) row[0] = '';
+                if (!row[1]) row[1] = '';
+                if (!row[2]) row[2] = '';
+
+                const rawGrade = row[1];
+                const [transmuted, remarks] = transmuteGrade(rawGrade);
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td><i class="bi bi-question-circle validation-icon text-muted" id="status-${index}"></i></td>
+                    <td contenteditable="true" class="editable-cell" onblur="updateData(${index}, 0, this.innerText)" onfocus="highlightRow(this)">${row[0]}</td>
+                    <td id="student-name-${index}" class="text-muted">-</td>
+                    <td>${units}</td>
+                    <td contenteditable="true" class="editable-cell" oninput="handleGradeInput(${index}, this)" onblur="updateData(${index}, 1, this.innerText)" onfocus="highlightRow(this)">${rawGrade}</td>
+                    <td id="transmuted-${index}"><span class="fw-bold text-primary">${transmuted}</span></td>
+                    <td id="remarks-${index}"><span class="badge ${remarks === 'Passed' ? 'bg-success' : 'bg-danger'}">${remarks}</span> <small class="text-muted">${row[2]}</small></td>
+                `;
+                previewTableBody.appendChild(tr);
             });
 
-            if (data.length > 10) {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td colspan="4" class="text-center text-muted">... and ${data.length - 10} more rows</td>`;
-                previewTableBody.appendChild(tr);
-            }
-
-            previewContainer.style.display = 'block';
+            updateSummary(data.length, 0, 0, 0);
         }
 
-        publishBtn.addEventListener('click', () => {
-            if (parsedData.length === 0) return;
-            if (!confirm('Are you sure you want to publish these grades?')) return;
+        // Highlight row being edited
+        window.highlightRow = function(cell) {
+            document.querySelectorAll('tr').forEach(tr => tr.classList.remove('table-active'));
+            cell.closest('tr').classList.add('table-active');
+        };
 
-            fetch('api.php?action=publish_grades', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ grades: parsedData })
-            })
-            .then(response => response.json())
-            .then(result => {
+        // Handle Real-time Grade Transmutation
+        window.handleGradeInput = function(index, cell) {
+            const raw = cell.innerText;
+            const [transmuted, remarks] = transmuteGrade(raw);
+            
+            document.getElementById(`transmuted-${index}`).innerHTML = `<span class="fw-bold text-primary">${transmuted}</span>`;
+            
+            // Preserve existing notes if any
+            const existingNotes = parsedData[index][2] || '';
+            document.getElementById(`remarks-${index}`).innerHTML = `<span class="badge ${remarks === 'Passed' ? 'bg-success' : 'bg-danger'}">${remarks}</span> <small class="text-muted">${existingNotes}</small>`;
+        };
+
+        // Update parsedData array when cell is blurred
+        window.updateData = function(index, colIndex, value) {
+            parsedData[index][colIndex] = value.trim();
+            
+            // If Student ID changed, reset validation status for that row
+            if (colIndex === 0) {
+                document.getElementById(`status-${index}`).className = 'bi bi-question-circle validation-icon text-muted';
+                document.getElementById(`student-name-${index}`).textContent = '-';
+                document.getElementById(`status-${index}`).closest('tr').className = '';
+                
+                // Reset summary counts (visual only, real count updates on Validate)
+                // We force user to click Validate again to be sure
+                publishBtn.disabled = true;
+            }
+        };
+
+        function updateSummary(total, valid, invalid, duplicates) {
+            previewSummary.innerHTML = `
+                Total: <strong>${total}</strong> | 
+                Valid: <strong class="text-success">${valid}</strong> | 
+                Error: <strong class="text-danger">${invalid}</strong> | 
+                Auto-Enroll: <strong class="text-info">${duplicates}</strong>
+            `;
+        }
+
+        // Validate Students
+        validateBtn.addEventListener('click', async () => {
+            if (!currentClassId) {
+                alert("Please select a class first.");
+                return;
+            }
+
+            validateBtn.disabled = true;
+            validateBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Validating...';
+
+            const studentIds = parsedData
+                .filter(row => row[0])
+                .map(row => row[0]);
+
+            try {
+                const response = await fetch('api.php?action=validate_students', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        student_ids: studentIds,
+                        class_id: currentClassId 
+                    })
+                });
+
+                const result = await response.json();
+
                 if (result.success) {
-                    alert('Grades published successfully!');
+                    // Process validation results
+                    result.valid.forEach(student => {
+                        validationResults[student.school_id] = {
+                            valid: true,
+                            name: student.name,
+                            status: 'valid'
+                        };
+                    });
+
+                    result.invalid.forEach(school_id => {
+                        validationResults[school_id] = {
+                            valid: false,
+                            status: 'not_found'
+                        };
+                    });
+
+                    if (result.not_enrolled) {
+                        result.not_enrolled.forEach(school_id => {
+                            validationResults[school_id] = {
+                                valid: true, // Treat as valid for auto-enrollment
+                                status: 'not_enrolled'
+                            };
+                        });
+                    }
+
+                    // Update UI
+                    let validCount = 0;
+                    let errorCount = 0;
+                    let autoEnrollCount = 0;
+
+                    parsedData.forEach((row, index) => {
+                        const schoolId = row[0];
+                        const statusIcon = document.getElementById(`status-${index}`);
+                        const nameCell = document.getElementById(`student-name-${index}`);
+                        const rowElem = statusIcon.closest('tr');
+
+                        if (validationResults[schoolId]) {
+                            const res = validationResults[schoolId];
+                            if (res.status === 'valid') {
+                                statusIcon.className = 'bi bi-check-circle-fill validation-icon text-success';
+                                nameCell.textContent = res.name;
+                                rowElem.className = 'row-valid';
+                                validCount++;
+                            } else if (res.status === 'not_enrolled') {
+                                statusIcon.className = 'bi bi-person-plus-fill validation-icon text-info';
+                                nameCell.textContent = 'Will Auto-Enroll';
+                                rowElem.className = 'row-duplicate'; // Using duplicate style for auto-enroll
+                                autoEnrollCount++;
+                            } else {
+                                statusIcon.className = 'bi bi-exclamation-circle-fill validation-icon text-danger';
+                                nameCell.textContent = 'Not Found';
+                                rowElem.className = 'row-invalid';
+                                errorCount++;
+                            }
+                        }
+                    });
+
+                    updateSummary(parsedData.length, validCount, errorCount, autoEnrollCount);
+
+                    if (validCount > 0 || autoEnrollCount > 0) {
+                        publishBtn.disabled = false;
+                    }
+
+                    alert(`Validation complete!\n✓ ${validCount} enrolled students\nℹ️ ${autoEnrollCount} will be auto-enrolled\n✗ ${errorCount} errors (not found)`);
+                }
+            } catch (error) {
+                alert('Error validating students: ' + error.message);
+            } finally {
+                validateBtn.disabled = false;
+                validateBtn.innerHTML = '<i class="bi bi-shield-check me-1"></i>Validate Students';
+            }
+        });
+
+        // Publish Grades
+        publishBtn.addEventListener('click', async () => {
+            if (!currentClassId) {
+                alert("Please select a class first.");
+                return;
+            }
+
+            const section = sectionInput.value;
+            const subjectCode = subjectCodeInput.value;
+            const subjectName = subjectNameInput.value;
+            const semester = semesterInput.value;
+
+            if (!confirm(`Confirm upload?\n\nClass: ${subjectCode} - ${section}\nTotal Records: ${parsedData.length}\n\nThis will save/update grades in the database.`)) {
+                return;
+            }
+
+            publishBtn.disabled = true;
+            publishBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Publishing...';
+
+            try {
+                const response = await fetch('api.php?action=bulk_upload_grades', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        grades: parsedData,
+                        section: section,
+                        subject_code: subjectCode,
+                        subject_name: subjectName,
+                        semester: semester,
+                        class_id: currentClassId
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    let msg = `✓ Success!\n\nInserted: ${result.inserted}\nUpdated: ${result.updated}\nErrors: ${result.errors.length}`;
+                    if (result.auto_enrolled && result.auto_enrolled.length > 0) {
+                        msg += `\n\nℹ️ ${result.auto_enrolled.length} students were auto-enrolled.`;
+                    }
+                    alert(msg);
+                    
+                    // Reset form
                     previewContainer.style.display = 'none';
                     parsedData = [];
+                    fileInput.value = '';
                 } else {
                     alert('Error: ' + result.message);
                 }
-            })
-            .catch(err => alert('Network error occurred.'));
+            } catch (error) {
+                alert('Network error: ' + error.message);
+            } finally {
+                publishBtn.disabled = false;
+                publishBtn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Publish Grades';
+            }
         });
     </script>
 

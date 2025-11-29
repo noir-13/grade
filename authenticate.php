@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email']);
     $password = $_POST['password'];
 
-    $stmt = $conn->prepare("SELECT id, role, full_name, password_hash, email, is_verified, school_id, status FROM users WHERE email = ?");
+    $stmt = $conn->prepare("SELECT id, role, full_name, password_hash, email, is_verified, school_id, status, is_profile_complete FROM users WHERE email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -73,19 +73,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit();
             }
 
-            // 2. Check Profile Completion
-            if (empty($user['school_id']) || empty($user['full_name'])) {
-                $_SESSION['verify_email'] = $email;
-                $_SESSION['login_error'] = "Please complete your profile.";
-                header("Location: register.php?step=3");
-                exit();
-            }
-
-            // 3. Login Success
+            // 2. Login Success
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['full_name'] = $user['full_name'];
             $_SESSION['email'] = $user['email'];
             $_SESSION['role'] = $user['role'];
+            $_SESSION['school_id'] = $user['school_id'];
+            $_SESSION['is_profile_complete'] = $user['is_profile_complete'];
 
             if ($user['role'] === 'admin') {
                 header("Location: admin_dashboard.php");

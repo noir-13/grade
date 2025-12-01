@@ -12,22 +12,22 @@ $message = '';
 $messageType = '';
 
 // Fetch user data
-$stmt = $conn->prepare("SELECT full_name, email, role, phone_number, is_profile_complete FROM users WHERE id = ?");
+$stmt = $conn->prepare("SELECT full_name, email, role, phone_number, is_profile_complete, section FROM users WHERE id = ?");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $user = $stmt->get_result()->fetch_assoc();
 
 // Handle Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $phone = trim($_POST['phone_number']);
+    $section = trim($_POST['section'] ?? '');
     
-    if (empty($phone)) {
-        $message = "Phone number is required.";
+    if ($user['role'] === 'student' && !empty($section) && preg_match('/[^a-zA-Z0-9]/', $section)) {
+        $message = "Section must be alphanumeric (e.g., 209, A, B1).";
         $messageType = "danger";
     } else {
         // Update User
-        $stmtUpdate = $conn->prepare("UPDATE users SET phone_number = ?, is_profile_complete = 1 WHERE id = ?");
-        $stmtUpdate->bind_param("si", $phone, $user_id);
+        $stmtUpdate = $conn->prepare("UPDATE users SET section = ?, is_profile_complete = 1 WHERE id = ?");
+        $stmtUpdate->bind_param("si", $section, $user_id);
         
         if ($stmtUpdate->execute()) {
             $_SESSION['is_profile_complete'] = 1;
@@ -78,10 +78,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="email" class="vds-input" value="<?php echo htmlspecialchars($user['email']); ?>" disabled>
             </div>
             
+            <?php if ($user['role'] === 'student'): ?>
             <div class="mb-4">
-                <label class="vds-label">Phone Number <span class="text-danger">*</span></label>
-                <input type="text" name="phone_number" class="vds-input" placeholder="09123456789" value="<?php echo htmlspecialchars($user['phone_number'] ?? ''); ?>" required>
+                <label class="vds-label">Section</label>
+                <input type="text" name="section" class="vds-input" placeholder="e.g. 209" value="<?php echo htmlspecialchars($user['section'] ?? ''); ?>">
             </div>
+            <?php endif; ?>
 
             <button type="submit" class="vds-btn vds-btn-primary w-100">
                 Save & Continue <i class="bi bi-arrow-right ms-2"></i>

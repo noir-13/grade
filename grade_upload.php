@@ -30,6 +30,7 @@ while ($row = $result->fetch_assoc()) {
     <link href="bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="verdantDesignSystem.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         .vds-file-drop {
             border: 2px dashed var(--vds-sage);
@@ -207,7 +208,8 @@ while ($row = $result->fetch_assoc()) {
             if (raw >= 82) return ['2.25', 'Passed'];
             if (raw >= 79) return ['2.50', 'Passed'];
             if (raw >= 76) return ['2.75', 'Passed'];
-            if (raw >= 75) return ['3.00', 'Passed'];
+            if (raw >= 76) return ['2.75', 'Passed'];
+            if (raw >= 70) return ['3.00', 'Passed'];
             return ['5.00', 'Failed'];
         }
 
@@ -246,6 +248,14 @@ while ($row = $result->fetch_assoc()) {
                 ['2024-2-000552', '74', 'Needs improvement']
             ];
             const ws = XLSX.utils.aoa_to_sheet(wsData);
+            
+            // Set column widths
+            ws['!cols'] = [
+                { wch: 20 }, // Student ID
+                { wch: 15 }, // Raw Grade
+                { wch: 30 }  // Notes
+            ];
+            
             XLSX.utils.book_append_sheet(wb, ws, "Template");
             XLSX.writeFile(wb, "grade_upload_template.xlsx");
         });
@@ -321,10 +331,20 @@ while ($row = $result->fetch_assoc()) {
                 const rawGrade = row[1];
                 const [transmuted, remarks] = transmuteGrade(rawGrade);
                 
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td><i class="bi bi-question-circle validation-icon text-muted" id="status-${index}"></i></td>
+                    const studentId = row[0];
+                    const idRegex = /^\d{4}-\d{1}-\d{6}$/;
+                    let statusIcon = 'bi-question-circle text-muted';
+                    let statusTitle = 'Pending Validation';
+
+                    if (studentId && !idRegex.test(studentId)) {
+                        statusIcon = 'bi-exclamation-triangle-fill text-warning';
+                        statusTitle = 'Invalid ID Format (xxxx-x-xxxxxx)';
+                    }
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td><i class="bi ${statusIcon} validation-icon" id="status-${index}" title="${statusTitle}"></i></td>
                     <td contenteditable="true" class="editable-cell" onblur="updateData(${index}, 0, this.innerText)" onfocus="highlightRow(this)">${row[0]}</td>
                     <td id="student-name-${index}" class="text-muted">-</td>
                     <td>${units}</td>
@@ -347,6 +367,16 @@ while ($row = $result->fetch_assoc()) {
         // Handle Real-time Grade Transmutation
         window.handleGradeInput = function(index, cell) {
             const raw = cell.innerText;
+            const rawFloat = parseFloat(raw);
+            
+            if (isNaN(rawFloat) || rawFloat < 0 || rawFloat > 100) {
+                 cell.classList.add('text-danger', 'fw-bold');
+                 cell.title = "Grade must be between 0 and 100";
+            } else {
+                 cell.classList.remove('text-danger', 'fw-bold');
+                 cell.title = "";
+            }
+
             const [transmuted, remarks] = transmuteGrade(raw);
             
             document.getElementById(`transmuted-${index}`).innerHTML = `<span class="fw-bold text-primary">${transmuted}</span>`;
@@ -362,9 +392,20 @@ while ($row = $result->fetch_assoc()) {
             
             // If Student ID changed, reset validation status for that row
             if (colIndex === 0) {
-                document.getElementById(`status-${index}`).className = 'bi bi-question-circle validation-icon text-muted';
+                const idRegex = /^\d{4}-\d{1}-\d{6}$/;
+                const isValidFormat = idRegex.test(value);
+                
+                const statusEl = document.getElementById(`status-${index}`);
+                if (!isValidFormat && value) {
+                    statusEl.className = 'bi bi-exclamation-triangle-fill validation-icon text-warning';
+                    statusEl.title = 'Invalid ID Format (xxxx-x-xxxxxx)';
+                } else {
+                    statusEl.className = 'bi bi-question-circle validation-icon text-muted';
+                    statusEl.title = 'Pending Validation';
+                }
+                
                 document.getElementById(`student-name-${index}`).textContent = '-';
-                document.getElementById(`status-${index}`).closest('tr').className = '';
+                statusEl.closest('tr').className = '';
                 
                 // Reset summary counts (visual only, real count updates on Validate)
                 // We force user to click Validate again to be sure
@@ -419,8 +460,8 @@ while ($row = $result->fetch_assoc()) {
 
                     result.invalid.forEach(school_id => {
                         validationResults[school_id] = {
-                            valid: false,
-                            status: 'not_found'
+                            valid: true,
+                            status: 'ghost_create'
                         };
                     });
 
@@ -456,6 +497,11 @@ while ($row = $result->fetch_assoc()) {
                                 nameCell.textContent = 'Will Auto-Enroll';
                                 rowElem.className = 'row-duplicate'; // Using duplicate style for auto-enroll
                                 autoEnrollCount++;
+                            } else if (res.status === 'ghost_create') {
+                                statusIcon.className = 'bi bi-person-badge-fill validation-icon text-warning';
+                                nameCell.textContent = 'Will Create Ghost Account';
+                                rowElem.className = 'row-duplicate';
+                                autoEnrollCount++;
                             } else {
                                 statusIcon.className = 'bi bi-exclamation-circle-fill validation-icon text-danger';
                                 nameCell.textContent = 'Not Found';
@@ -471,10 +517,15 @@ while ($row = $result->fetch_assoc()) {
                         publishBtn.disabled = false;
                     }
 
-                    alert(`Validation complete!\n✓ ${validCount} enrolled students\nℹ️ ${autoEnrollCount} will be auto-enrolled\n✗ ${errorCount} errors (not found)`);
+                    Swal.fire({
+                        title: 'Validation Complete',
+                        html: `✓ ${validCount} enrolled students<br>ℹ️ ${autoEnrollCount} will be auto-enrolled<br>✗ ${errorCount} errors (not found)`,
+                        icon: 'info',
+                        confirmButtonColor: '#0D3B2E'
+                    });
                 }
             } catch (error) {
-                alert('Error validating students: ' + error.message);
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Error validating students: ' + error.message });
             } finally {
                 validateBtn.disabled = false;
                 validateBtn.innerHTML = '<i class="bi bi-shield-check me-1"></i>Validate Students';
@@ -484,7 +535,7 @@ while ($row = $result->fetch_assoc()) {
         // Publish Grades
         publishBtn.addEventListener('click', async () => {
             if (!currentClassId) {
-                alert("Please select a class first.");
+                Swal.fire({ icon: 'warning', title: 'Warning', text: 'Please select a class first.' });
                 return;
             }
 
@@ -493,9 +544,28 @@ while ($row = $result->fetch_assoc()) {
             const subjectName = subjectNameInput.value;
             const semester = semesterInput.value;
 
-            if (!confirm(`Confirm upload?\n\nClass: ${subjectCode} - ${section}\nTotal Records: ${parsedData.length}\n\nThis will save/update grades in the database.`)) {
+            // Check for invalid grades
+            const hasInvalidGrades = parsedData.some(row => {
+                const grade = parseFloat(row[1]);
+                return isNaN(grade) || grade < 0 || grade > 100;
+            });
+
+            if (hasInvalidGrades) {
+                Swal.fire({ icon: 'error', title: 'Invalid Grades', text: 'Some grades are invalid (must be 0-100). Please correct them before publishing.' });
                 return;
             }
+
+            const result = await Swal.fire({
+                title: 'Confirm Upload?',
+                html: `Class: ${subjectCode} - ${section}<br>Total Records: ${parsedData.length}<br><br>This will save/update grades in the database.`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#0D3B2E',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, Upload'
+            });
+
+            if (!result.isConfirmed) return;
 
             publishBtn.disabled = true;
             publishBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Publishing...';
@@ -517,21 +587,26 @@ while ($row = $result->fetch_assoc()) {
                 const result = await response.json();
 
                 if (result.success) {
-                    let msg = `✓ Success!\n\nInserted: ${result.inserted}\nUpdated: ${result.updated}\nErrors: ${result.errors.length}`;
+                    let msg = `Inserted: ${result.inserted}<br>Updated: ${result.updated}<br>Errors: ${result.errors.length}`;
                     if (result.auto_enrolled && result.auto_enrolled.length > 0) {
-                        msg += `\n\nℹ️ ${result.auto_enrolled.length} students were auto-enrolled.`;
+                        msg += `<br><br>ℹ️ ${result.auto_enrolled.length} students were auto-enrolled.`;
                     }
-                    alert(msg);
+                    Swal.fire({
+                        title: 'Success!',
+                        html: msg,
+                        icon: 'success',
+                        confirmButtonColor: '#0D3B2E'
+                    });
                     
                     // Reset form
                     previewContainer.style.display = 'none';
                     parsedData = [];
                     fileInput.value = '';
                 } else {
-                    alert('Error: ' + result.message);
+                    Swal.fire({ icon: 'error', title: 'Error', text: result.message });
                 }
             } catch (error) {
-                alert('Network error: ' + error.message);
+                Swal.fire({ icon: 'error', title: 'Network Error', text: error.message });
             } finally {
                 publishBtn.disabled = false;
                 publishBtn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Publish Grades';

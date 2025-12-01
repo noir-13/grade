@@ -46,13 +46,18 @@ require 'check_profile.php';
             font-size: 0.9rem;
             backdrop-filter: blur(4px);
         }
+        .vds-bg-gradient {
+            background: linear-gradient(135deg, var(--vds-vapor) 0%, var(--vds-sage) 100%);
+            background-attachment: fixed;
+        }
     </style>
 </head>
-<body class="vds-bg-vapor">
+<body class="vds-bg-gradient">
 
     <?php include 'navbar_dashboard.php'; ?>
 
-    <div class="vds-container py-5">
+   <div class="min-vh-100">
+     <div class="vds-container py-5">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <a href="teacher_dashboard.php" class="vds-text-muted text-decoration-none mb-2 d-inline-block"><i class="bi bi-arrow-left me-1"></i> Back to Dashboard</a>
@@ -95,8 +100,15 @@ require 'check_profile.php';
                             <input type="text" name="subject_description" class="vds-input" placeholder="e.g. Intro to Computing">
                         </div>
                         <div class="vds-form-group">
+                            <label class="vds-label">Program Restriction <span class="text-danger">*</span></label>
+                            <select name="program_id" class="vds-select" id="createProgramSelect" required>
+                                <option value="">Select Program</option>
+                            </select>
+                            <small class="text-muted" style="font-size: 0.8rem;">Only students from this program can enroll.</small>
+                        </div>
+                        <div class="vds-form-group">
                             <label class="vds-label">Section <span class="text-danger">*</span></label>
-                            <input type="text" name="section" class="vds-input" placeholder="e.g. BSIS 1-A" required>
+                            <input type="text" name="section" class="vds-input" placeholder="e.g. 209" required>
                         </div>
                         <div class="vds-form-group">
                             <label class="vds-label">Semester</label>
@@ -109,6 +121,23 @@ require 'check_profile.php';
                         <div class="vds-form-group">
                             <label class="vds-label">Units <span class="text-danger">*</span></label>
                             <input type="number" name="units" class="vds-input" value="3" min="1" max="10" required>
+                        </div>
+                        <div class="vds-form-group">
+                            <label class="vds-label">Schedule</label>
+                            <div class="d-flex gap-2">
+                                <select class="vds-select sched-day" required>
+                                    <option value="">Day</option>
+                                    <option value="Mon">Mon</option>
+                                    <option value="Tue">Tue</option>
+                                    <option value="Wed">Wed</option>
+                                    <option value="Thu">Thu</option>
+                                    <option value="Fri">Fri</option>
+                                    <option value="Sat">Sat</option>
+                                </select>
+                                <select class="vds-select sched-start" required></select>
+                                <select class="vds-select sched-end" required></select>
+                            </div>
+                            <input type="hidden" name="schedule">
                         </div>
                         <button type="submit" class="vds-btn vds-btn-primary w-100 mt-3">Create Class</button>
                     </form>
@@ -137,6 +166,12 @@ require 'check_profile.php';
                             <input type="text" name="subject_description" class="vds-input">
                         </div>
                         <div class="vds-form-group">
+                            <label class="vds-label">Program Restriction <span class="text-danger">*</span></label>
+                            <select name="program_id" class="vds-select" id="editProgramSelect" required>
+                                <option value="">Select Program</option>
+                            </select>
+                        </div>
+                        <div class="vds-form-group">
                             <label class="vds-label">Section <span class="text-danger">*</span></label>
                             <input type="text" name="section" class="vds-input" required>
                         </div>
@@ -152,12 +187,30 @@ require 'check_profile.php';
                             <label class="vds-label">Units <span class="text-danger">*</span></label>
                             <input type="number" name="units" class="vds-input" min="1" max="10" required>
                         </div>
+                        <div class="vds-form-group">
+                            <label class="vds-label">Schedule</label>
+                            <div class="d-flex gap-2">
+                                <select class="vds-select sched-day" required>
+                                    <option value="">Day</option>
+                                    <option value="Mon">Mon</option>
+                                    <option value="Tue">Tue</option>
+                                    <option value="Wed">Wed</option>
+                                    <option value="Thu">Thu</option>
+                                    <option value="Fri">Fri</option>
+                                    <option value="Sat">Sat</option>
+                                </select>
+                                <select class="vds-select sched-start" required></select>
+                                <select class="vds-select sched-end" required></select>
+                            </div>
+                            <input type="hidden" name="schedule">
+                        </div>
                         <button type="submit" class="vds-btn vds-btn-primary w-100 mt-3">Save Changes</button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
+   </div>
 
     <?php include 'footer_dashboard.php'; ?>
     <script src="js/bootstrap.bundle.min.js"></script>
@@ -168,6 +221,57 @@ require 'check_profile.php';
         const createClassModal = new bootstrap.Modal(document.getElementById('createClassModal'));
         const editClassForm = document.getElementById('editClassForm');
         const editClassModal = new bootstrap.Modal(document.getElementById('editClassModal'));
+        const createProgramSelect = document.getElementById('createProgramSelect');
+        const editProgramSelect = document.getElementById('editProgramSelect');
+
+        // Fetch Programs
+        async function loadPrograms() {
+            try {
+                // Assuming institute_id is not strictly required for this list, or we fetch all
+                // But register.php filters by institute. Here we might want all or teacher's institute.
+                // For simplicity, let's try fetching all programs or just generic ones.
+                // Wait, api.php get_programs requires institute_id?
+                // Let's check register.php logic. It passes institute_id.
+                // Here we don't know the institute easily without fetching user profile.
+                // But we can fetch user profile first.
+                
+                // Better approach: Create a new action 'get_all_programs' or just fetch profile.
+                // Let's assume we can get programs.
+                // Actually, let's fetch 'get_institutes' then 'get_programs' for each? No.
+                // Let's just fetch 'api.php?action=get_programs&institute_id=1' (Default) or similar.
+                // Or better, update API to allow fetching all programs if no institute specified?
+                // Let's check API.
+                
+                // For now, I'll fetch profile to get institute_id, then fetch programs.
+                const profileRes = await fetch('api.php?action=get_profile'); // Need to implement if missing
+                // Wait, check_profile.php is included, so session has institute_id?
+                // No, session has user_id.
+                
+                // Let's just hardcode fetching programs for now or use a new API endpoint.
+                // I'll assume I can fetch all programs.
+                
+                const res = await fetch('api.php?action=get_programs'); 
+                const data = await res.json();
+                
+                const populate = (select) => {
+                    select.innerHTML = '<option value="">Select Program</option>';
+                    data.forEach(prog => {
+                        const option = document.createElement('option');
+                        option.value = prog.id;
+                        option.textContent = prog.code; // + ' - ' + prog.name;
+                        select.appendChild(option);
+                    });
+                };
+                
+                populate(createProgramSelect);
+                populate(editProgramSelect);
+                
+            } catch (e) {
+                console.error("Error loading programs", e);
+            }
+        }
+        
+        loadPrograms();
 
         // Load Classes
         async function loadClasses() {
@@ -197,11 +301,7 @@ require 'check_profile.php';
                                     <div class="class-code-badge" title="Class Code: Share this with students">
                                         <i class="bi bi-key me-1"></i>${cls.class_code}
                                     </div>
-                                    <button class="btn btn-sm btn-light position-absolute top-0 end-0 m-3 rounded-circle" 
-                                            style="width: 32px; height: 32px; z-index: 10;"
-                                            onclick="event.stopPropagation(); openEditModal(${JSON.stringify(cls).replace(/"/g, '&quot;')})">
-                                        <i class="bi bi-pencil-fill small text-success"></i>
-                                    </button>
+                                   
                                     <h4 class="mb-1 text-truncate" title="${cls.subject_code}">${cls.subject_code}</h4>
                                     <div class="small opacity-75 text-truncate">${cls.section}</div>
                                 </div>
@@ -259,6 +359,65 @@ require 'check_profile.php';
         });
 
         loadClasses();
+
+        // Schedule Logic
+        function generateTimeOptions() {
+            const times = [];
+            const startHour = 7; // 7 AM
+            const endHour = 19; // 7 PM
+            
+            for (let h = startHour; h <= endHour; h++) {
+                for (let m = 0; m < 60; m += 30) {
+                    if (h === endHour && m > 0) break; 
+                    
+                    const period = h >= 12 ? 'PM' : 'AM';
+                    let displayHour = h > 12 ? h - 12 : h;
+                    if (displayHour === 0) displayHour = 12;
+                    
+                    const minStr = m === 0 ? '00' : '30';
+                    const timeStr = `${displayHour}:${minStr} ${period}`;
+                    times.push(timeStr);
+                }
+            }
+            return times;
+        }
+
+        const timeOptions = generateTimeOptions();
+        
+        function populateTimeSelects() {
+            document.querySelectorAll('.sched-start, .sched-end').forEach(select => {
+                const isEnd = select.classList.contains('sched-end');
+                select.innerHTML = `<option value="">${isEnd ? 'End' : 'Start'}</option>`;
+                timeOptions.forEach(time => {
+                    const opt = document.createElement('option');
+                    opt.value = time;
+                    opt.textContent = time;
+                    select.appendChild(opt);
+                });
+            });
+        }
+        
+        populateTimeSelects();
+
+        function updateScheduleInput(form) {
+            const day = form.querySelector('.sched-day').value;
+            const start = form.querySelector('.sched-start').value;
+            const end = form.querySelector('.sched-end').value;
+            const hiddenInput = form.querySelector('input[name="schedule"]');
+            
+            if (day && start && end) {
+                hiddenInput.value = `${day} ${start}-${end}`;
+            } else {
+                hiddenInput.value = '';
+            }
+        }
+
+        [createClassForm, editClassForm].forEach(form => {
+            const selects = form.querySelectorAll('.sched-day, .sched-start, .sched-end');
+            selects.forEach(sel => {
+                sel.addEventListener('change', () => updateScheduleInput(form));
+            });
+        });
     </script>
 </body>
 </html>

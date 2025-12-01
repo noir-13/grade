@@ -9,11 +9,11 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'student') {
 
 $user_id = $_SESSION['user_id'];
 $full_name = $_SESSION['full_name'];
-$school_id = $_SESSION['school_id'];
+$school_id = $_SESSION['school_id'] ?? 'N/A';
 
 // Fetch all grades with semester grouping
 $stmt = $conn->prepare("
-    SELECT g.*, u.full_name as teacher_name, c.units, c.subject_description
+    SELECT g.*, u.full_name as teacher_name, c.units, c.subject_description, c.section as class_section
     FROM grades g
     LEFT JOIN users u ON g.teacher_id = u.id
     LEFT JOIN classes c ON g.class_id = c.id
@@ -37,11 +37,19 @@ while ($row = $result->fetch_assoc()) {
     $grades_by_semester[$semester][] = $row;
 }
 
-// Fetch student section
-$stmtUser = $conn->prepare("SELECT section FROM users WHERE id = ?");
+// Fetch student section and program
+$stmtUser = $conn->prepare("
+    SELECT u.section, p.code as program_code 
+    FROM users u 
+    LEFT JOIN programs p ON u.program_id = p.id 
+    WHERE u.id = ?
+");
 $stmtUser->bind_param("i", $user_id);
 $stmtUser->execute();
-$userSection = $stmtUser->get_result()->fetch_assoc()['section'] ?? 'N/A';
+$userRow = $stmtUser->get_result()->fetch_assoc();
+$userSection = $userRow['section'] ?? 'N/A';
+$programCode = $userRow['program_code'] ?? '';
+$fullSection = trim("$programCode $userSection");
 
 // Calculate overall statistics (GWA)
 $total_grade_points = 0;
@@ -72,7 +80,7 @@ $overall_gwa = $total_units > 0 ? number_format($total_grade_points / $total_uni
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="verdantDesignSystem.css">
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         .semester-section {
             margin-bottom: 2rem;
@@ -86,6 +94,15 @@ $overall_gwa = $total_units > 0 ? number_format($total_grade_points / $total_uni
         .grade-pill {
             min-width: 60px;
             text-align: center;
+        }
+        @media print {
+            @page { size: A4; margin: 10mm; }
+            body { background: white !important; }
+            .vds-container { max-width: 100% !important; width: 100% !important; padding: 0 !important; }
+            .vds-card { box-shadow: none !important; border: 1px solid #eee !important; }
+            .semester-header { background: #0f4c3a !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .table-responsive { overflow: visible !important; }
+            .d-print-none { display: none !important; }
         }
     </style>
 </head>
@@ -103,8 +120,8 @@ $overall_gwa = $total_units > 0 ? number_format($total_grade_points / $total_uni
                 <p class="vds-text-muted">Complete record of your grades and academic performance</p>
             </div>
             <div>
-                <button id="downloadExcel" class="vds-btn vds-btn-secondary me-2">
-                    <i class="bi bi-file-earmark-excel me-1"></i>Download Excel
+                <button id="downloadPdf" class="vds-btn vds-btn-secondary me-2">
+                    <i class="bi bi-file-earmark-pdf me-1"></i>Download PDF
                 </button>
                 <button id="printGrades" class="vds-btn vds-btn-primary">
                     <i class="bi bi-printer me-1"></i>Print
@@ -112,155 +129,226 @@ $overall_gwa = $total_units > 0 ? number_format($total_grade_points / $total_uni
             </div>
         </div>
 
-        <!-- Statistics Card -->
-        <div class="row g-4 mb-5">
-            <div class="col-md-3">
-                <div class="vds-card p-4 text-center">
-                    <i class="bi bi-trophy-fill display-4 mb-2" style="color: var(--vds-forest);"></i>
-                    <h3 class="vds-h3 mb-1"><?php echo $overall_gwa; ?></h3>
-                    <p class="vds-text-muted mb-0">Overall GWA</p>
-                </div>
+        <div id="gradeReport">
+            <!-- Header for PDF only -->
+            <div class="d-none d-print-block mb-4 text-center" id="pdfHeader">
+                <h2 class="vds-h2">KLD Grade System</h2>
+                <p class="mb-1">Student Grade Report</p>
+                <p class="small text-muted">Generated on <?php echo date('F d, Y'); ?></p>
             </div>
-            <div class="col-md-3">
-                <div class="vds-card p-4 text-center">
-                    <i class="bi bi-journal-bookmark display-4 mb-2" style="color: #0284c7;"></i>
-                    <h3 class="vds-h3 mb-1"><?php echo $total_count; ?></h3>
-                    <p class="vds-text-muted mb-0">Total Subjects</p>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="vds-card p-4 text-center">
-                    <i class="bi bi-person-badge display-4 mb-2" style="color: #b45309;"></i>
-                    <h3 class="vds-h3 mb-1"><?php echo htmlspecialchars($userSection); ?></h3>
-                    <p class="vds-text-muted mb-0">Section</p>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="vds-card p-4 text-center">
-                    <i class="bi bi-person-badge display-4 mb-2" style="color: #15803d;"></i>
-                    <h3 class="vds-h3 mb-1"><?php echo htmlspecialchars($school_id); ?></h3>
-                    <p class="vds-text-muted mb-0">Student ID</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Grades by Semester -->
-        <?php if (count($grades_by_semester) > 0): ?>
-            <?php foreach ($grades_by_semester as $semester => $grades): ?>
-                <div class="semester-section">
-                    <div class="vds-card overflow-hidden">
-                        <div class="semester-header">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h3 class="vds-h3 mb-1" style="color: white;"><?php echo htmlspecialchars($semester); ?></h3>
-                                    <p class="mb-0" style="color: rgba(255,255,255,0.8);"><?php echo count($grades); ?> subjects</p>
-                                </div>
-                                <div class="text-end">
-                                    <?php
-                                        $sem_grade_points = 0;
-                                        $sem_units = 0;
-                                        foreach ($grades as $g) {
-                                            $u = intval($g['units'] ?? 3);
-                                            $sem_grade_points += (floatval($g['grade']) * $u);
-                                            $sem_units += $u;
-                                        }
-                                        $sem_gwa = $sem_units > 0 ? number_format($sem_grade_points / $sem_units, 2) : 'N/A';
-                                    ?>
-                                    <span class="small" style="color: rgba(255,255,255,0.7);">Semester GWA</span>
-                                    <h2 class="vds-h2 mb-0" style="color: white;"><?php echo $sem_gwa; ?></h2>
-                                </div>
-                            </div>
+            
+            <div class="d-none d-print-block mb-4" id="studentInfoPdf">
+                <div class="vds-card p-3">
+                    <div class="row">
+                        <div class="col-6">
+                            <p class="mb-1"><strong>Name:</strong> <?php echo htmlspecialchars($full_name); ?></p>
+                            <p class="mb-0"><strong>Student ID:</strong> <?php echo htmlspecialchars($school_id); ?></p>
                         </div>
-                        <div class="table-responsive">
-                            <table class="vds-table mb-0">
-                                <thead>
-                                    <tr>
-                                        <th class="ps-4">Subject Code</th>
-                                        <th>Subject Name</th>
-                                        <th>Units</th>
-                                        <th>Section</th>
-                                        <th>Raw Grade</th>
-                                        <th>Grade</th>
-                                        <th>Remarks</th>
-                                        <th class="text-end pe-4">Date Posted</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($grades as $grade): ?>
-                                        <tr>
-                                            <td class="ps-4 fw-bold" style="color: var(--vds-forest);">
-                                                <?php echo htmlspecialchars($grade['subject_code']); ?>
-                                            </td>
-                                            <td><?php echo htmlspecialchars($grade['subject_name'] ?? '-'); ?></td>
-                                            <td><?php echo htmlspecialchars($grade['units'] ?? 3); ?></td>
-                                            <td><?php echo htmlspecialchars($grade['section'] ?? '-'); ?></td>
-                                            <td><?php echo htmlspecialchars($grade['raw_grade'] ?? '-'); ?></td>
-                                            <td>
-                                                <?php 
-                                                    $g = floatval($grade['grade']);
-                                                    $color = $g <= 3.0 ? 'text-success' : 'text-danger';
-                                                    echo "<span class='fw-bold $color'>" . number_format($g, 2) . "</span>";
-                                                ?>
-                                            </td>
-                                            <td><?php echo htmlspecialchars($grade['remarks'] ?? '-'); ?></td>
-                                            <td class="text-end pe-4 text-muted">
-                                                <?php echo date('M d, Y', strtotime($grade['created_at'])); ?>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
+                        <div class="col-6 text-end">
+                            <p class="mb-1"><strong>Section:</strong> <?php echo htmlspecialchars($fullSection); ?></p>
+                            <p class="mb-0"><strong>Overall GWA:</strong> <?php echo $overall_gwa; ?></p>
                         </div>
                     </div>
                 </div>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <div class="vds-card p-5 text-center">
-                <i class="bi bi-inbox display-1 text-muted mb-3" style="opacity: 0.3;"></i>
-                <h3 class="vds-h3 text-muted">No Grades Available</h3>
-                <p class="vds-text-muted">Your grades will appear here once posted by your teachers.</p>
             </div>
-        <?php endif; ?>
+
+            <!-- Statistics Card -->
+            <div class="row g-4 mb-5 d-print-none">
+                <div class="col-md-3">
+                    <div class="vds-card p-4 text-center">
+                        <i class="bi bi-trophy-fill display-4 mb-2" style="color: var(--vds-forest);"></i>
+                        <h3 class="vds-h3 mb-1"><?php echo $overall_gwa; ?></h3>
+                        <p class="vds-text-muted mb-0">Overall GWA</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="vds-card p-4 text-center">
+                        <i class="bi bi-journal-bookmark display-4 mb-2" style="color: #0284c7;"></i>
+                        <h3 class="vds-h3 mb-1"><?php echo $total_count; ?></h3>
+                        <p class="vds-text-muted mb-0">Total Subjects</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="vds-card p-4 text-center">
+                        <i class="bi bi-person-badge display-4 mb-2" style="color: #b45309;"></i>
+                        <h3 class="vds-h3 mb-1"><?php echo htmlspecialchars(($fullSection === '0' || empty($fullSection)) ? 'N/A' : $fullSection); ?></h3>
+                        <p class="vds-text-muted mb-0">Section</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="vds-card p-4 text-center">
+                        <i class="bi bi-person-badge display-4 mb-2" style="color: #15803d;"></i>
+                        <h3 class="vds-h3 mb-1"><?php echo htmlspecialchars($school_id); ?></h3>
+                        <p class="vds-text-muted mb-0">Student ID</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grades by Semester -->
+            <?php if (count($grades_by_semester) > 0): ?>
+                <?php foreach ($grades_by_semester as $semester => $grades): 
+                    $semId = 'sem-' . md5($semester);
+                ?>
+                    <div class="semester-section" id="<?php echo $semId; ?>">
+                        <div class="vds-card overflow-hidden">
+                            <div class="semester-header">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h3 class="vds-h3 mb-1" style="color: white;"><?php echo htmlspecialchars($semester); ?></h3>
+                                        <p class="mb-0" style="color: rgba(255,255,255,0.8);"><?php echo count($grades); ?> subjects</p>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="text-end">
+                                            <?php
+                                                $sem_grade_points = 0;
+                                                $sem_units = 0;
+                                                foreach ($grades as $g) {
+                                                    $u = intval($g['units'] ?? 3);
+                                                    $sem_grade_points += (floatval($g['grade']) * $u);
+                                                    $sem_units += $u;
+                                                }
+                                                $sem_gwa = $sem_units > 0 ? number_format($sem_grade_points / $sem_units, 2) : 'N/A';
+                                            ?>
+                                            <span class="small" style="color: rgba(255,255,255,0.7);">Semester GWA</span>
+                                            <h2 class="vds-h2 mb-0" style="color: white;"><?php echo $sem_gwa; ?></h2>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-light download-sem-btn d-print-none" data-sem-id="<?php echo $semId; ?>" data-sem-name="<?php echo htmlspecialchars($semester); ?>" title="Download Semester PDF">
+                                            <i class="bi bi-download"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="vds-table mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th class="ps-4">Subject Code</th>
+                                            <th>Subject Name</th>
+                                            <th>Units</th>
+                                            <th>Section</th>
+                                            <th>Raw Grade</th>
+                                            <th>Grade</th>
+                                            <th>Remarks</th>
+                                            <th class="text-end pe-4">Date Posted</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($grades as $grade): ?>
+                                            <tr>
+                                                <td class="ps-4 fw-bold" style="color: var(--vds-forest);">
+                                                    <?php echo htmlspecialchars($grade['subject_code']); ?>
+                                                </td>
+                                                <td><?php echo htmlspecialchars($grade['subject_name'] ?? '-'); ?></td>
+                                                <td><?php echo htmlspecialchars($grade['units'] ?? 3); ?></td>
+                                                <td><?php 
+                                                    $sec = $grade['section'];
+                                                    if (empty($sec) || $sec === '0') {
+                                                        $sec = $grade['class_section'] ?? '-';
+                                                    }
+                                                    if (is_numeric($sec) && !empty($programCode)) {
+                                                        $sec = "$programCode $sec";
+                                                    }
+                                                    echo htmlspecialchars($sec); 
+                                                ?></td>
+                                                <td><?php echo htmlspecialchars($grade['raw_grade'] ?? '-'); ?></td>
+                                                <td>
+                                                    <?php 
+                                                        $g = floatval($grade['grade']);
+                                                        $color = $g <= 3.0 ? 'text-success' : 'text-danger';
+                                                        echo "<span class='fw-bold $color'>" . number_format($g, 2) . "</span>";
+                                                    ?>
+                                                </td>
+                                                <td><?php echo htmlspecialchars($grade['remarks'] ?? '-'); ?></td>
+                                                <td class="text-end pe-4 text-muted">
+                                                    <?php echo date('M d, Y', strtotime($grade['created_at'])); ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="vds-card p-5 text-center">
+                    <i class="bi bi-inbox display-1 text-muted mb-3" style="opacity: 0.3;"></i>
+                    <h3 class="vds-h3 text-muted">No Grades Available</h3>
+                    <p class="vds-text-muted">Your grades will appear here once posted by your teachers.</p>
+                </div>
+            <?php endif; ?>
+        </div>
     </div>
 
     <?php include 'footer_dashboard.php'; ?>
 
     <script>
-        // Download as Excel
-        document.getElementById('downloadExcel').addEventListener('click', () => {
-            const wb = XLSX.utils.book_new();
+        // Download Full PDF
+        document.getElementById('downloadPdf').addEventListener('click', () => {
+            const element = document.getElementById('gradeReport');
+            const header = document.getElementById('pdfHeader');
+            const info = document.getElementById('studentInfoPdf');
             
-            // Create summary sheet
-            const summaryData = [
-                ['KLD Grading System - Student Grade Report'],
-                ['Student Name:', '<?php echo addslashes($full_name); ?>'],
-                ['Student ID:', '<?php echo addslashes($school_id); ?>'],
-                ['Section:', '<?php echo addslashes($userSection); ?>'],
-                ['Overall GWA:', '<?php echo $overall_gwa; ?>'],
-                ['Generated:', new Date().toLocaleDateString()],
-                [],
-                ['Semester', 'Subject Code', 'Subject Name', 'Units', 'Section', 'Raw Grade', 'Grade', 'Remarks', 'Date Posted']
-            ];
+            // Temporarily show header/info for PDF generation
+            header.classList.remove('d-none');
+            info.classList.remove('d-none');
+            
+            const opt = {
+                margin: [10, 10, 10, 10],
+                filename: 'My_Grades_Full_<?php echo $school_id; ?>.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
 
-            <?php foreach ($grades_by_semester as $semester => $grades): ?>
-                <?php foreach ($grades as $grade): ?>
-                summaryData.push([
-                    '<?php echo addslashes($semester); ?>',
-                    '<?php echo addslashes($grade['subject_code']); ?>',
-                    '<?php echo addslashes($grade['subject_name'] ?? ''); ?>',
-                    '<?php echo addslashes($grade['units'] ?? 3); ?>',
-                    '<?php echo addslashes($grade['section'] ?? ''); ?>',
-                    '<?php echo addslashes($grade['raw_grade'] ?? ''); ?>',
-                    <?php echo $grade['grade']; ?>,
-                    '<?php echo addslashes($grade['remarks'] ?? ''); ?>',
-                    '<?php echo date('Y-m-d', strtotime($grade['created_at'])); ?>'
-                ]);
-                <?php endforeach; ?>
-            <?php endforeach; ?>
+            // Generate PDF
+            html2pdf().set(opt).from(element).save().then(() => {
+                // Hide header again
+                header.classList.add('d-none');
+                info.classList.add('d-none');
+            });
+        });
 
-            const ws = XLSX.utils.aoa_to_sheet(summaryData);
-            XLSX.utils.book_append_sheet(wb, ws, "Grades");
-            XLSX.writeFile(wb, 'My_Grades_<?php echo $school_id; ?>.xlsx');
+        // Download Semester PDF
+        document.querySelectorAll('.download-sem-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const semId = btn.dataset.semId;
+                const semName = btn.dataset.semName;
+                const semCard = document.getElementById(semId).cloneNode(true);
+                
+                // Remove the download button from the clone
+                const btnInClone = semCard.querySelector('.download-sem-btn');
+                if(btnInClone) btnInClone.remove();
+
+                // Create container
+                const container = document.createElement('div');
+                container.innerHTML = `
+                    <div class="mb-4 text-center">
+                        <h2 class="vds-h2">KLD Grade System</h2>
+                        <p class="mb-1">Semester Grade Report</p>
+                        <p class="small text-muted">Generated on <?php echo date('F d, Y'); ?></p>
+                    </div>
+                `;
+                
+                // Clone student info
+                const infoClone = document.getElementById('studentInfoPdf').cloneNode(true);
+                infoClone.classList.remove('d-none');
+                container.appendChild(infoClone);
+                
+                // Append semester card
+                container.appendChild(semCard);
+
+                const opt = {
+                    margin: [10, 10, 10, 10],
+                    filename: `Grade_Report_${semName.replace(/[^a-z0-9]/gi, '_')}.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+
+                html2pdf().set(opt).from(container).save();
+            });
         });
 
         // Print

@@ -1,4 +1,6 @@
 <?php
+$lifetime = 86400 * 7; // 7 days
+session_set_cookie_params($lifetime);
 session_start();
 require 'db_connect.php';
 require 'PHPMailer-7.0.0/src/PHPMailer.php';
@@ -43,6 +45,14 @@ function resendOTP($email) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Rate Limiting Check
+    if (isset($_SESSION['lockout_time']) && time() < $_SESSION['lockout_time']) {
+        $remaining = ceil(($_SESSION['lockout_time'] - time()) / 60);
+        $_SESSION['login_error'] = "Too many failed attempts. Please try again in $remaining minutes.";
+        header("Location: login.php");
+        exit();
+    }
+
     $email = trim($_POST['email']);
     $password = $_POST['password'];
 
@@ -51,53 +61,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute();
     $result = $stmt->get_result();
 
+    $login_successful = false;
+    $user = null;
+
     if ($result->num_rows === 1) {
         $user = $result->fetch_assoc();
-
         if (password_verify($password, $user['password_hash'])) {
-            
-            // 1. Check Verification
-            if ($user['is_verified'] == 0) {
-                $_SESSION['verify_email'] = $email;
-                resendOTP($email);
-                $_SESSION['login_error'] = "Email not verified. A new code has been sent.";
-                header("Location: register.php?step=2");
-                exit();
-            }
+            $login_successful = true;
+        }
+    }
 
-            // 1.5 Check Approval Status (For Teachers)
-            if ($user['status'] === 'pending') {
-                $_SESSION['login_error'] = "Your account is awaiting approval from the Institute Head.";
-                $_SESSION['login_email'] = $email;
-                header("Location: login.php");
-                exit();
-            }
-
-            // 2. Login Success
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['full_name'] = $user['full_name'];
-            $_SESSION['email'] = $user['email'];
-            $_SESSION['role'] = $user['role'];
-            $_SESSION['school_id'] = $user['school_id'];
-            $_SESSION['is_profile_complete'] = $user['is_profile_complete'];
-
-            if ($user['role'] === 'admin') {
-                header("Location: admin_dashboard.php");
-            } elseif ($user['role'] === 'teacher') {
-                header("Location: teacher_dashboard.php");
-            } else {
-                header("Location: student_dashboard.php");
-            }
+    if ($login_successful) {
+        // 1. Check Verification
+        if ($user['is_verified'] == 0) {
+            $_SESSION['verify_email'] = $email;
+            $_SESSION['register_step'] = 2;
+            resendOTP($email);
+            $_SESSION['login_error'] = "Email not verified. A new code has been sent.";
+            header("Location: register.php?step=2");
             exit();
+        }
 
-        } else {
-            $_SESSION['login_error'] = "Incorrect password.";
+        // 1.5 Check Approval Status (For Teachers)
+        if ($user['status'] === 'pending') {
+            $_SESSION['login_error'] = "Your account is awaiting approval from the Institute Head.";
             $_SESSION['login_email'] = $email;
             header("Location: login.php");
             exit();
         }
+
+        // 2. Login Success
+        session_regenerate_id(true); // Prevent Session Fixation
+        $_SESSION['login_attempts'] = 0; // Reset attempts
+        unset($_SESSION['lockout_time']);
+
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['full_name'] = $user['full_name'];
+        $_SESSION['email'] = $user['email'];
+        $_SESSION['role'] = $user['role'];
+        $_SESSION['school_id'] = $user['school_id'];
+        $_SESSION['is_profile_complete'] = $user['is_profile_complete'];
+
+        if ($user['role'] === 'admin') {
+            header("Location: admin_dashboard.php");
+        } elseif ($user['role'] === 'teacher') {
+            header("Location: teacher_dashboard.php");
+        } else {
+            header("Location: student_dashboard.php");
+        }
+        exit();
+
     } else {
-        $_SESSION['login_error'] = "No account found with that email.";
+        // Failed Login
+        if (!isset($_SESSION['login_attempts'])) $_SESSION['login_attempts'] = 0;
+        $_SESSION['login_attempts']++;
+        
+        if ($_SESSION['login_attempts'] >= 5) {
+            $_SESSION['lockout_time'] = time() + (15 * 60); // 15 minutes
+            $_SESSION['login_error'] = "Too many failed attempts. Please try again in 15 minutes.";
+        } else {
+            $_SESSION['login_error'] = "Incorrect email or password.";
+        }
+        
         $_SESSION['login_email'] = $email;
         header("Location: login.php");
         exit();

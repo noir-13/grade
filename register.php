@@ -1,44 +1,20 @@
 <?php
 session_start();
 require 'db_connect.php';
-require 'PHPMailer-7.0.0/src/PHPMailer.php';
-require 'PHPMailer-7.0.0/src/SMTP.php';
-require 'PHPMailer-7.0.0/src/Exception.php';
+require 'email_helper.php';
 
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
-// Helper: Send OTP
+// Helper: Send OTP (Wrapper for email_helper)
 function sendOTP($email, $otp) {
-    $mail = new PHPMailer(true);
-    try {
-        $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';
-        $mail->SMTPAuth   = true;
-        $mail->Username   = 'kevinselibio10@gmail.com'; 
-        $mail->Password   = 'ruxmlcupgdicyywc';   
-        $mail->SMTPSecure = 'tls';
-        $mail->Port       = 587;
-
-        $mail->setFrom('kevinselibio10@gmail.com', 'KLD Grade System');
-        $mail->addAddress($email);
-
-        $mail->isHTML(true);
-        $mail->Subject = 'KLD Verification Code';
-        $mail->Body    = "
-            <div style='font-family: Arial, sans-serif; padding: 20px; color: #333;'>
-                <h2 style='color: #0D3B2E;'>Verification Code</h2>
-                <p>Your OTP code is:</p>
-                <h1 style='font-size: 32px; letter-spacing: 5px; color: #0D3B2E;'>$otp</h1>
-                <p>This code will expire in 10 minutes.</p>
-            </div>
-        ";
-
-        $mail->send();
-        return true;
-    } catch (Exception $e) {
-        return false;
-    }
+    $subject = 'KLD Verification Code';
+    $body = "
+        <div style='font-family: Arial, sans-serif; padding: 20px; color: #333;'>
+            <h2 style='color: #0D3B2E;'>Verification Code</h2>
+            <p>Your OTP code is:</p>
+            <h1 style='font-size: 32px; letter-spacing: 5px; color: #0D3B2E;'>$otp</h1>
+            <p>This code will expire in 10 minutes.</p>
+        </div>
+    ";
+    return sendEmail($email, $subject, $body);
 }
 
 // --- Session Persistence Logic ---
@@ -63,6 +39,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register_step1'])) {
 
     if (!str_ends_with($email, '@kld.edu.ph')) {
         $error = "Registration is restricted to @kld.edu.ph emails only.";
+    } elseif (strlen($password) < 8) {
+        $error = "Password must be at least 8 characters long.";
+    } elseif (!preg_match('/[A-Z]/', $password) || !preg_match('/[a-z]/', $password) || !preg_match('/[0-9]/', $password)) {
+        $error = "Password must contain at least one uppercase letter, one lowercase letter, and one number.";
     } elseif ($password !== $confirm) {
         $error = "Passwords do not match.";
     } else {
@@ -198,6 +178,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['complete_profile'])) {
     $role = $_POST['role']; // 'student' or 'teacher'
     $institute_id = intval($_POST['institute_id']);
     
+    // Validate Student ID
+    if (!preg_match('/^\d{4}-\d{1}-\d{6}$/', $school_id)) {
+        $error = "Student ID must follow the format xxxx-x-xxxxxx (e.g., 2024-2-000550).";
+    }
+
+    // Validate Section (for students)
+    $section = trim($_POST['section'] ?? '');
+    if ($role === 'student') {
+        if (empty($section)) {
+             $error = "Section is required for students.";
+        } elseif (preg_match('/[^a-zA-Z0-9]/', $section)) {
+             $error = "Section must be alphanumeric (e.g., 209, A, B1).";
+        }
+    } else {
+        $section = null;
+    }
+
     // Program is optional for teachers
     $program_id = isset($_POST['program_id']) && $_POST['program_id'] !== '' ? intval($_POST['program_id']) : null;
     
@@ -206,9 +203,49 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['complete_profile'])) {
     // Determine status
     $status = ($role === 'teacher') ? 'pending' : 'active';
 
-    // Update User
-    $stmt = $conn->prepare("UPDATE users SET school_id = ?, full_name = ?, program_id = ?, institute_id = ?, role = ?, status = ? WHERE email = ?");
-    $stmt->bind_param("ssiisss", $school_id, $full_name, $program_id, $institute_id, $role, $status, $email);
+    if (empty($error)) {
+        // Check if school_id exists
+        $stmtCheck = $conn->prepare("SELECT id, status FROM users WHERE school_id = ?");
+        $stmtCheck->bind_param("s", $school_id);
+        $stmtCheck->execute();
+        $resCheck = $stmtCheck->get_result();
+        
+        if ($rowCheck = $resCheck->fetch_assoc()) {
+            if ($rowCheck['status'] === 'ghost') {
+                // Claim Ghost Account
+                $conn->begin_transaction();
+                try {
+                    $ghost_id = $rowCheck['id'];
+                    
+                    // Get Current User ID
+                    $stmtCurr = $conn->prepare("SELECT id FROM users WHERE email = ?");
+                    $stmtCurr->bind_param("s", $email);
+                    $stmtCurr->execute();
+                    $curr_id = $stmtCurr->get_result()->fetch_assoc()['id'];
+                    
+                    // Migrate Data
+                    $conn->query("UPDATE enrollments SET student_id = $curr_id WHERE student_id = $ghost_id");
+                    $conn->query("UPDATE grades SET student_id = $curr_id WHERE student_id = $ghost_id");
+                    
+                    // Delete Ghost
+                    $conn->query("DELETE FROM users WHERE id = $ghost_id");
+                    
+                    $conn->commit();
+                } catch (Exception $e) {
+                    $conn->rollback();
+                    $error = "Error claiming account: " . $e->getMessage();
+                }
+                
+            } else {
+                $error = "School ID already registered.";
+            }
+        }
+    }
+
+    if (empty($error)) {
+        // Update User
+        $stmt = $conn->prepare("UPDATE users SET school_id = ?, full_name = ?, program_id = ?, institute_id = ?, role = ?, status = ?, section = ? WHERE email = ?");
+        $stmt->bind_param("ssiissss", $school_id, $full_name, $program_id, $institute_id, $role, $status, $section, $email);
     
     if ($stmt->execute()) {
         // Clear registration session data
@@ -230,12 +267,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['complete_profile'])) {
             $_SESSION['email'] = $email;
             $_SESSION['role'] = $user['role'];
             $_SESSION['full_name'] = $full_name;
+            $_SESSION['school_id'] = $school_id;
             
             header("Location: student_dashboard.php");
             exit();
         }
     } else {
         $error = "Failed to update profile: " . $conn->error;
+    }
     }
 }
 ?>
@@ -245,26 +284,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['complete_profile'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register | KLD Grade System</title>
-    <link href="css/bootstrap.min.css" rel="stylesheet">
-    <link href="bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+    <title>Register - KLD Grade System</title>
     <link rel="stylesheet" href="verdantDesignSystem.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
-
-    <nav class="vds-navbar">
-        <div class="vds-container vds-nav-content">
-            <a href="index.php" class="vds-brand">
-                <img src="assets/logo2.png" alt="Logo" height="40">
-                KLD Portal
-            </a>
-            <div class="vds-nav-links">
-                <a href="index.php" class="vds-nav-link">Home</a>
-                <a href="login.php" class="vds-btn vds-btn-secondary">Login</a>
-            </div>
-        </div>
-    </nav>
-
+    <?php include 'navbar.php'; ?>
     <div class="vds-section vds-min-h-screen vds-flex-center">
         <div class="vds-glass" style="width: 100%; max-width: 500px; padding: 40px;">
             
@@ -308,16 +334,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['complete_profile'])) {
                     <button type="submit" name="verify_otp" class="vds-btn vds-btn-primary w-100 mb-3">Verify Code</button>
                 </form>
                 
-                <form method="POST" class="text-center">
-                    <button type="submit" name="resend_otp" class="vds-btn vds-btn-secondary btn-sm" style="font-size: 0.8rem; padding: 6px 16px;">Resend Code</button>
+                <form method="POST">
+                    <button type="submit" name="resend_otp" class="vds-btn vds-btn-secondary w-100 mt-3">Resend Code</button>
                 </form>
-                
-                <div class="text-center mt-3">
-                    <a href="register.php?step=1" class="vds-text-muted small">Wrong email? Start over</a>
-                </div>
 
             <?php elseif ($step == '3'): ?>
-                <!-- STEP 3: Complete Profile -->
+                <!-- STEP 3: Personal Information -->
                 <div class="text-center mb-4">
                     <h2 class="vds-h2">Complete Profile</h2>
                     <p class="vds-text-muted">Step 3 of 3: Personal Information</p>
@@ -363,6 +385,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['complete_profile'])) {
                         </select>
                     </div>
 
+                    <!-- Section is only for Students -->
+                    <div class="vds-form-group" id="sectionGroup">
+                        <label class="vds-label">Section</label>
+                        <input type="text" name="section" id="sectionInput" class="vds-input" placeholder="e.g. 209">
+                    </div>
+
                     <button type="submit" name="complete_profile" class="vds-btn vds-btn-primary w-100">Finish Registration</button>
                 </form>
 
@@ -378,15 +406,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['complete_profile'])) {
             const programSelect = document.getElementById('programSelect');
             const roleSelect = document.getElementById('roleSelect');
             const programGroup = document.getElementById('programGroup');
+            const sectionGroup = document.getElementById('sectionGroup');
+            const sectionInput = document.getElementById('sectionInput');
 
-            // Toggle Program field based on Role
+            // Toggle Program & Section field based on Role
             roleSelect.addEventListener('change', function() {
                 if (this.value === 'teacher') {
                     programGroup.style.display = 'none';
                     programSelect.required = false;
+                    sectionGroup.style.display = 'none';
+                    sectionInput.required = false;
                 } else {
                     programGroup.style.display = 'block';
                     programSelect.required = true;
+                    sectionGroup.style.display = 'block';
+                    sectionInput.required = true;
                 }
             });
 
@@ -422,5 +456,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['complete_profile'])) {
         }
     </script>
 
+    <?php if(isset($error) && $error): ?>
+    <script>
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: '<?php echo addslashes($error); ?>',
+            confirmButtonColor: '#0D3B2E'
+        });
+    </script>
+    <?php endif; ?>
+
+    <?php if(isset($success) && $success): ?>
+    <script>
+        Swal.fire({
+            icon: 'success',
+            title: 'Success',
+            text: '<?php echo addslashes($success); ?>',
+            confirmButtonColor: '#0D3B2E'
+        });
+    </script>
+    <?php endif; ?>
 </body>
 </html>

@@ -3,11 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>System Walkthrough | KLD GradeVault</title>
-    <link href="css/bootstrap.min.css" rel="stylesheet" />
-    <link href="bootstrap-icons/bootstrap-icons.css" rel="stylesheet" />
-    <link rel="stylesheet" href="verdantDesignSystem.css" />
+    <title>Comprehensive System Documentation | KLD GradeVault</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
     <style>
+      :root {
+        --vds-vapor: #f4f7f6;
+        --vds-forest: #1a4d2e;
+        --vds-sage: #d1e7dd;
+        --vds-text-muted: #6c757d;
+      }
+
       body {
         background-color: var(--vds-vapor);
         color: var(--vds-forest);
@@ -41,9 +54,10 @@
         font-weight: 600;
       }
       .section-title {
-        font-size: 2.5rem;
+        font-size: 2rem;
         font-weight: 700;
         margin-bottom: 1.5rem;
+        margin-top: 3rem;
         color: var(--vds-forest);
         border-bottom: 2px solid var(--vds-sage);
         padding-bottom: 0.5rem;
@@ -55,280 +69,628 @@
         margin-bottom: 2rem;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
         border: 1px solid rgba(0, 0, 0, 0.05);
-        transition: transform 0.2s;
       }
-      .feature-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 15px rgba(0, 0, 0, 0.05);
+      .table-schema th {
+        background-color: var(--vds-sage);
+        color: var(--vds-forest);
       }
-      .role-badge {
-        display: inline-block;
-        padding: 0.25rem 0.75rem;
-        border-radius: 50px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        margin-bottom: 1rem;
+      code {
+        color: #d63384;
+        background-color: rgba(214, 51, 132, 0.1);
+        padding: 0.1rem 0.3rem;
+        border-radius: 4px;
       }
-      .badge-admin {
-        background: #fee2e2;
-        color: #b91c1c;
-      }
-      .badge-teacher {
-        background: #dcfce7;
-        color: #15803d;
-      }
-      .badge-student {
-        background: #e0f2fe;
-        color: #0284c7;
-      }
-      .step-number {
-        display: inline-flex;
-        align-items: center;
+      /* Mermaid container styling */
+      .mermaid {
+        background: white;
+        padding: 1rem;
+        border-radius: 8px;
+        text-align: center;
+        display: flex;
         justify-content: center;
-        width: 32px;
-        height: 32px;
-        background: var(--vds-forest);
-        color: white;
-        border-radius: 50%;
-        font-weight: bold;
-        margin-right: 10px;
       }
     </style>
   </head>
   <body>
-    <!-- Sidebar Navigation -->
     <nav class="sidebar">
       <div class="mb-5">
-        <img src="assets/logo2.png" alt="KLD Logo" height="40" class="mb-3" />
-        <h5 class="fw-bold">GradeVault Guide</h5>
-        <p class="text-muted small">System Walkthrough & User Journey</p>
+        <div class="d-flex align-items-center mb-3">
+          <i class="bi bi-shield-lock-fill fs-2 me-2 text-success"></i>
+          <h5 class="fw-bold m-0">GradeVault</h5>
+        </div>
+        <p class="text-muted small">System Architecture & Guide</p>
       </div>
 
       <div class="nav flex-column">
-        <a href="#overview" class="nav-link active">Overview</a>
-        <a href="#phase1" class="nav-link">Phase 1: The Setup</a>
-        <a href="#phase2" class="nav-link">Phase 2: Student Exp.</a>
-        <a href="#phase3" class="nav-link">Phase 3: Grading Day</a>
-        <a href="#tech-stack" class="nav-link">Technical Stack</a>
+        <a href="#overview" class="nav-link active">1. System Overview</a>
+        <a href="#architecture" class="nav-link">2. System Architecture</a>
+        <a href="#database" class="nav-link">3. Database Schema</a>
+        <a href="#roles" class="nav-link">4. User Roles</a>
+        <a href="#pages" class="nav-link">5. Pages Description</a>
+        <a href="#workflows" class="nav-link">6. Core Workflows</a>
+        <a href="#updates" class="nav-link">7. Recent Updates</a>
+        <a href="#testing" class="nav-link">8. Testing Checklist</a>
       </div>
     </nav>
 
-    <!-- Main Content -->
     <main class="main-content">
-      <!-- Overview Section -->
-      <section id="overview" class="mb-5">
-        <h1 class="section-title">System Overview</h1>
-        <p class="lead mb-4">
-          <strong>KLD GradeVault</strong> streamlines the grading process for a
-          multi-institute college by digitizing grade submission, verification,
-          and distribution.
+      <section id="overview">
+        <h1 class="display-4 fw-bold mb-4">KLD GradeVault System</h1>
+        <p class="lead">
+          A comprehensive, web-based grading and class management system
+          designed for multi-institute educational environments. It facilitates
+          the secure management of student grades, class enrollments, and
+          faculty records.
+        </p>
+        <div class="alert alert-success">
+          <strong>Key Features:</strong> Role-Based Access Control (RBAC),
+          Automated Grade Transmutation, Excel Grade Uploads, and Real-time
+          Academic History.
+        </div>
+      </section>
+
+      <section id="architecture">
+        <h2 class="section-title">2. System Architecture</h2>
+
+        <div class="row g-4">
+          <div class="col-md-6">
+            <div class="feature-card h-100">
+              <h4 class="mb-3">Technical Stack</h4>
+              <ul class="list-group list-group-flush">
+                <li class="list-group-item">
+                  <strong>Frontend:</strong> HTML5, CSS3 (Verdant Design
+                  System), Bootstrap 5, Vanilla JavaScript
+                </li>
+                <li class="list-group-item">
+                  <strong>Backend:</strong> PHP 8.0+ (Procedural/OOP Mix)
+                </li>
+                <li class="list-group-item">
+                  <strong>Database:</strong> MySQL / MariaDB
+                </li>
+                <li class="list-group-item">
+                  <strong>Libraries:</strong> SheetJS (Excel Parsing), PHPMailer
+                  (Email Notifications), Mermaid.js (Docs)
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="feature-card h-100">
+              <h4 class="mb-3">Folder Structure</h4>
+              <pre class="bg-light p-3 rounded">
+/Grade
+├── assets/          # Images and logos
+├── css/             # Stylesheets (Bootstrap, Custom)
+├── js/              # JavaScript bundles
+├── includes/        # Reusable PHP snippets
+├── PHPMailer/       # Email library
+├── *.php            # Core application files
+└── verdantDesignSystem.css # Main Design System
+                </pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="database">
+        <h2 class="section-title">3. Database Schema</h2>
+        <p class="text-muted mb-4">
+          The system uses a relational database. Below is the Entity
+          Relationship Diagram (ERD):
         </p>
 
+        <div class="feature-card">
+          <div class="mermaid">
+            erDiagram 
+                USERS ||--o{ CLASSES : "teaches" 
+                USERS ||--o{ GRADES : "receives" 
+                INSTITUTES ||--o{ USERS : "employs/enrolls" 
+                CLASSES ||--o{ GRADES : "contains" 
+                
+                USERS { 
+                    int id PK 
+                    string full_name 
+                    string email 
+                    enum role 
+                    int institute_id FK 
+                    enum status 
+                    string school_id 
+                    string section 
+                } 
+                CLASSES { 
+                    int id PK 
+                    int teacher_id FK 
+                    string subject_code 
+                    string section 
+                    string class_code 
+                    int units 
+                } 
+                GRADES { 
+                    int id PK 
+                    int student_id FK 
+                    int class_id FK 
+                    decimal raw_grade 
+                    decimal grade 
+                    string remarks 
+                } 
+                INSTITUTES { 
+                    int id PK 
+                    string name 
+                }
+          </div>
+        </div>
+      </section>
+
+      <section id="roles">
+        <h2 class="section-title">4. User Roles & Capabilities</h2>
         <div class="row g-4">
           <div class="col-md-4">
-            <div class="feature-card h-100">
-              <h3 class="h4 mb-3">Hierarchy-Aware</h3>
-              <p class="text-muted">
-                Respects organizational structure. Institute Heads only manage
-                their own faculty.
-              </p>
+            <div
+              class="feature-card h-100 border-danger border-top-0 border-end-0 border-bottom-0 border-3"
+            >
+              <h4 class="text-danger">Admin (Institute Head)</h4>
+              <ul>
+                <li>Approve pending teacher registrations.</li>
+                <li>Manage faculty lists.</li>
+                <li>View dashboard statistics.</li>
+                <li>Scope: Limited to their specific Institute.</li>
+              </ul>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="feature-card h-100">
-              <h3 class="h4 mb-3">Hybrid Enrollment</h3>
-              <p class="text-muted">
-                Students join via "Class Codes" or are
-                <strong>Auto-Enrolled</strong> when a teacher uploads a grade
-                sheet.
-              </p>
+            <div
+              class="feature-card h-100 border-success border-top-0 border-end-0 border-bottom-0 border-3"
+            >
+              <h4 class="text-success">Teacher</h4>
+              <ul>
+                <li>Create and manage classes.</li>
+                <li>Upload grades via Excel.</li>
+                <li>Edit grades manually (Raw/Transmuted).</li>
+                <li>View class records and student lists.</li>
+              </ul>
             </div>
           </div>
           <div class="col-md-4">
-            <div class="feature-card h-100">
-              <h3 class="h4 mb-3">Data Integrity</h3>
-              <p class="text-muted">
-                Grades are calculated automatically (Raw Score $\to$ Transmuted
-                Grade) to prevent errors.
-              </p>
+            <div
+              class="feature-card h-100 border-primary border-top-0 border-end-0 border-bottom-0 border-3"
+            >
+              <h4 class="text-primary">Student</h4>
+              <ul>
+                <li>Join classes via Class Code.</li>
+                <li>View academic history and grades.</li>
+                <li>Download Grade Reports (Excel).</li>
+                <li>View enrolled classes.</li>
+              </ul>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- Phase 1: The Setup -->
-      <section id="phase1" class="mb-5 pt-5">
-        <h2 class="section-title">Phase 1: The Setup (Admin & Teacher)</h2>
+      <section id="pages">
+        <h2 class="section-title">5. Pages Description</h2>
+        <div class="table-responsive">
+          <table class="table table-hover bg-white rounded shadow-sm">
+            <thead class="table-light">
+              <tr>
+                <th>File Name</th>
+                <th>Role</th>
+                <th>Functionality</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>index.php</code></td>
+                <td>Public</td>
+                <td>Landing page.</td>
+              </tr>
+              <tr>
+                <td><code>login.php</code></td>
+                <td>Public</td>
+                <td>User authentication.</td>
+              </tr>
+              <tr>
+                <td><code>register.php</code></td>
+                <td>Public</td>
+                <td>User registration (Student/Teacher).</td>
+              </tr>
+              <tr>
+                <td><code>admin_dashboard.php</code></td>
+                <td>Admin</td>
+                <td>Main admin overview.</td>
+              </tr>
+              <tr>
+                <td><code>admin_faculty.php</code></td>
+                <td>Admin</td>
+                <td>Approve and manage teachers.</td>
+              </tr>
+              <tr>
+                <td><code>teacher_dashboard.php</code></td>
+                <td>Teacher</td>
+                <td>Main teacher overview.</td>
+              </tr>
+              <tr>
+                <td><code>my_classes.php</code></td>
+                <td>Teacher</td>
+                <td>List of classes, Create Class modal.</td>
+              </tr>
+              <tr>
+                <td><code>class_details.php</code></td>
+                <td>Teacher</td>
+                <td>Specific class view, student list, upload button.</td>
+              </tr>
+              <tr>
+                <td><code>teacher_records.php</code></td>
+                <td>Teacher</td>
+                <td><strong>Gradebook</strong>: Edit grades, filter, sort.</td>
+              </tr>
+              <tr>
+                <td><code>grade_upload.php</code></td>
+                <td>Teacher</td>
+                <td>Excel upload interface with preview.</td>
+              </tr>
+              <tr>
+                <td><code>student_dashboard.php</code></td>
+                <td>Student</td>
+                <td>Main student overview.</td>
+              </tr>
+              <tr>
+                <td><code>student_classes.php</code></td>
+                <td>Student</td>
+                <td>Enrolled classes, Join Class modal.</td>
+              </tr>
+              <tr>
+                <td><code>student_history.php</code></td>
+                <td>Student</td>
+                <td>
+                  <strong>Academic History</strong>: View all grades, GWA,
+                  Export.
+                </td>
+              </tr>
+      <section id="workflows">
+        <h2 class="section-title">6. Core Workflows</h2>
 
         <div class="feature-card">
-          <span class="role-badge badge-teacher"
-            >Step 1: Teacher Registration</span
-          >
-          <h3 class="h4">Account Creation</h3>
-          <p class="text-muted mb-2">File: <code>register.php</code></p>
-          <p>
-            <span class="step-number">1</span> User registers with an
-            institutional email (<code>@kld.edu.ph</code>).<br />
-            <span class="step-number">2</span> Selects Institute (e.g.,
-            "Institute of Nursing") and Role ("Teacher").<br />
-            <span class="step-number">3</span> System sets status to
-            <strong>Pending Approval</strong>.
-          </p>
-        </div>
-
-        <div class="feature-card">
-          <span class="role-badge badge-admin">Step 2: Admin Approval</span>
-          <h3 class="h4">Faculty Verification</h3>
-          <p class="text-muted mb-2">File: <code>admin_faculty.php</code></p>
-          <p>
-            <span class="step-number">1</span> Institute Head logs in and sees
-            "Pending Approvals".<br />
-            <span class="step-number">2</span> Reviews details and clicks
-            <strong>[Approve]</strong>.<br />
-            <span class="step-number">3</span> Teacher account becomes Active.
-          </p>
-        </div>
-
-        <div class="feature-card">
-          <span class="role-badge badge-teacher">Step 3: Creating a Class</span>
-          <h3 class="h4">Class Management</h3>
-          <p class="text-muted mb-2">File: <code>my_classes.php</code></p>
-          <p>
-            <span class="step-number">1</span> Teacher logs in and clicks
-            "Create Class".<br />
-            <span class="step-number">2</span> Inputs Subject (e.g., ANAT101),
-            Section, and Semester.<br />
-            <span class="step-number">3</span> System generates a unique
-            <strong>Class Code</strong> (e.g., G7K-9L2).
-          </p>
-        </div>
-      </section>
-
-      <!-- Phase 2: Student Experience -->
-      <section id="phase2" class="mb-5 pt-5">
-        <h2 class="section-title">Phase 2: The Student Experience</h2>
-
-        <div class="feature-card">
-          <span class="role-badge badge-student"
-            >Step 4: Student Registration</span
-          >
-          <h3 class="h4">Instant Access</h3>
-          <p class="text-muted mb-2">File: <code>register.php</code></p>
-          <p>
-            Students register with their school email. Unlike teachers, they get
-            <strong>Instant Access</strong> without admin approval.
-          </p>
-        </div>
-
-        <div class="feature-card">
-          <span class="role-badge badge-student">Step 5: Joining a Class</span>
-          <h3 class="h4">Enrollment</h3>
-          <p class="text-muted mb-2">File: <code>student_classes.php</code></p>
-          <p>
-            <span class="step-number">1</span> Student logs in and clicks "Join
-            Class".<br />
-            <span class="step-number">2</span> Enters the 6-digit
-            <strong>Class Code</strong> provided by the teacher.<br />
-            <span class="step-number">3</span> The subject now appears on their
-            dashboard.
-          </p>
-        </div>
-      </section>
-
-      <!-- Phase 3: Grading Day -->
-      <section id="phase3" class="mb-5 pt-5">
-        <h2 class="section-title">Phase 3: Grading Day</h2>
-
-        <div class="feature-card">
-          <span class="role-badge badge-teacher">Step 6: Uploading Grades</span>
-          <h3 class="h4">Excel Import & Transmutation</h3>
-          <p class="text-muted mb-2">File: <code>grade_upload.php</code></p>
-          <p>
-            <span class="step-number">1</span> Teacher selects a class and
-            uploads an Excel file with
-            <strong>Raw Grades</strong> (0-100).<br />
-            <span class="step-number">2</span>
-            <strong>Auto-Calculation</strong>: System converts Raw Grades to
-            Transmuted Grades (e.g., 95 $\to$ 1.25).<br />
-            <span class="step-number">3</span> <strong>Auto-Enrollment</strong>:
-            If a student in the file is not in the class, the system
-            automatically enrolls them ("Ghost Student Fix").
-          </p>
-          <div class="alert alert-info mt-3">
-            <strong>Transmutation Logic:</strong><br />
-            97-100 $\to$ 1.00 | 94-96 $\to$ 1.25 | ... | < 75 $\to$ 5.00
-            (Failed)
+          <h4>
+            <i class="bi bi-file-earmark-spreadsheet me-2"></i>Grade Management
+            Process
+          </h4>
+          <div class="mermaid">
+            flowchart LR 
+                A[Teacher] -->|Creates Class| B(my_classes.php) 
+                B -->|Uploads Excel| C{grade_upload.php} 
+                C -->|Auto-Enroll| D[Enroll Students] 
+                C -->|Transmute| E[Calculate Grades] 
+                D --> F[Database] 
+                E --> F 
+                F -->|View| G[Student History]
+          </div>
+          <div class="mt-3 text-muted border-top pt-3">
+            <h6><i class="bi bi-info-circle me-2"></i>Workflow Explanation</h6>
+            <p>
+              This workflow illustrates the end-to-end grade processing
+              pipeline:
+            </p>
+            <ol>
+              <li>
+                <strong>Class Creation:</strong> The process begins with a
+                Teacher creating a class record.
+              </li>
+              <li>
+                <strong>Data Ingestion:</strong> Grades are uploaded via Excel.
+                The system parses this file.
+              </li>
+              <li>
+                <strong>Auto-Enrollment:</strong> If a student in the Excel file
+                isn't in the class roster, the system automatically enrolls them
+                ("Ghost Student" fix).
+              </li>
+              <li>
+                <strong>Transmutation:</strong> Raw scores (e.g., 88) are
+                automatically converted to the 1.0-5.0 grading scale.
+              </li>
+              <li>
+                <strong>Storage & Access:</strong> Data is committed to the
+                database, becoming immediately available for Student viewing.
+              </li>
+            </ol>
           </div>
         </div>
 
         <div class="feature-card">
-          <span class="role-badge badge-student">Step 7: Viewing Results</span>
-          <h3 class="h4">Grade Monitoring</h3>
-          <p class="text-muted mb-2">File: <code>student_history.php</code></p>
-          <p>
-            Student logs in to see their new grades. They can view a detailed
-            history grouped by semester and download an official grade report.
-          </p>
+          <h4><i class="bi bi-person-plus me-2"></i>Registration Flow</h4>
+          <div class="mermaid">
+            sequenceDiagram 
+                participant User 
+                participant System 
+                participant Admin 
+                
+                User->>System: Register (Teacher) 
+                System->>System: Set Status = Pending 
+                System-->>User: "Wait for Approval" 
+                Admin->>System: Login 
+                Admin->>System: View Pending Faculty 
+                Admin->>System: Approve User 
+                System->>System: Set Status = Active 
+                System-->>User: Access Granted
+          </div>
+          <div class="mt-3 text-muted border-top pt-3">
+            <h6><i class="bi bi-info-circle me-2"></i>Workflow Explanation</h6>
+            <p>
+              This sequence demonstrates the security protocol for new faculty:
+            </p>
+            <ul>
+              <li>
+                <strong>Registration:</strong> When a teacher signs up, their
+                account is created with a <code>PENDING</code> status.
+              </li>
+              <li>
+                <strong>Restriction:</strong> The teacher cannot log in
+                immediately.
+              </li>
+              <li>
+                <strong>Admin Review:</strong> An Institute Admin reviews the
+                registration request.
+              </li>
+              <li>
+                <strong>Approval:</strong> Upon Admin approval, the status
+                updates to <code>ACTIVE</code>, granting system access.
+              </li>
+            </ul>
+          </div>
         </div>
       </section>
 
-      <!-- Technical Stack -->
-      <section id="tech-stack" class="mb-5 pt-5">
-        <h2 class="section-title">Technical Stack</h2>
+      <section id="updates">
+        <h2 class="section-title">7. Recent Updates & Changelog</h2>
         <div class="row g-4">
-          <div class="col-md-6">
-            <div class="feature-card h-100">
-              <h3 class="h4">Frontend</h3>
-              <ul class="list-unstyled text-muted">
-                <li>
-                  <i class="bi bi-check-circle-fill text-success me-2"></i
-                  ><strong>Bootstrap 5</strong>: Responsive UI
+          <div class="col-md-12">
+            <div class="feature-card">
+              <h4 class="mb-3 text-primary">
+                <i class="bi bi-stars me-2"></i>New Features
+              </h4>
+              <ul class="list-group list-group-flush">
+                <li class="list-group-item">
+                  <strong>GradeVault Architecture Overhaul:</strong>
+                  Restructured the application into dedicated role-based pages
+                  (<code>admin_*.php</code>, <code>teacher_*.php</code>,
+                  <code>student_*.php</code>) for better security and
+                  maintainability.
                 </li>
-                <li>
-                  <i class="bi bi-check-circle-fill text-success me-2"></i
-                  ><strong>SheetJS</strong>: Excel parsing in browser
+                <li class="list-group-item">
+                  <strong>Dashboard Analytics:</strong> Enhanced Admin Dashboard
+                  with real-time charts for "Package Popularity" and "Event Type
+                  Distribution".
                 </li>
-                <li>
-                  <i class="bi bi-check-circle-fill text-success me-2"></i
-                  ><strong>Verdant Design System</strong>: Custom CSS
+                <li class="list-group-item">
+                  <strong>Account Recovery:</strong> Added a robust "Forgot
+                  Password" flow and "Archived Account Recovery" mechanism.
+                </li>
+                <li class="list-group-item">
+                  <strong>Ghost Student Fix:</strong> Improved the Excel upload
+                  process to automatically detect and enroll students who are in
+                  the grade file but not yet in the class roster.
                 </li>
               </ul>
             </div>
           </div>
-          <div class="col-md-6">
-            <div class="feature-card h-100">
-              <h3 class="h4">Backend</h3>
-              <ul class="list-unstyled text-muted">
-                <li>
-                  <i class="bi bi-check-circle-fill text-success me-2"></i
-                  ><strong>PHP 8+</strong>: Core logic
-                </li>
-                <li>
-                  <i class="bi bi-check-circle-fill text-success me-2"></i
-                  ><strong>MySQL</strong>: Relational database
-                </li>
-                <li>
-                  <i class="bi bi-check-circle-fill text-success me-2"></i
-                  ><strong>RBAC</strong>: Role-Based Access Control
-                </li>
-              </ul>
+        </div>
+      </section>
+
+      <section id="testing">
+        <h2 class="section-title">8. Features Testing & Debugging Checklist</h2>
+        <p class="text-muted mb-4">
+          Use this checklist to verify system functionality after any updates or
+          deployments.
+        </p>
+
+        <div class="accordion" id="testingAccordion">
+          <!-- Authentication -->
+          <div class="accordion-item">
+            <h2 class="accordion-header">
+              <button
+                class="accordion-button"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapseAuth"
+              >
+                <i class="bi bi-shield-lock me-2"></i> Authentication & Security
+              </button>
+            </h2>
+            <div
+              id="collapseAuth"
+              class="accordion-collapse collapse show"
+              data-bs-parent="#testingAccordion"
+            >
+              <div class="accordion-body">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="auth1" />
+                  <label class="form-check-label" for="auth1">
+                    <strong>Login:</strong> Verify successful login for Admin,
+                    Teacher, and Student with valid credentials.
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="auth2" />
+                  <label class="form-check-label" for="auth2">
+                    <strong>Invalid Login:</strong> Verify error message for
+                    incorrect password or non-existent email.
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="auth3" />
+                  <label class="form-check-label" for="auth3">
+                    <strong>Registration:</strong> Register a new Teacher/Student
+                    and verify they appear in the database (Pending for
+                    Teacher).
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="auth4" />
+                  <label class="form-check-label" for="auth4">
+                    <strong>Forgot Password:</strong> Request a reset link,
+                    verify email receipt (mock/log), and reset password
+                    successfully.
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="auth5" />
+                  <label class="form-check-label" for="auth5">
+                    <strong>Session Security:</strong> Try accessing
+                    <code>admin_dashboard.php</code> as a Student (should
+                    redirect/deny).
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Admin -->
+          <div class="accordion-item">
+            <h2 class="accordion-header">
+              <button
+                class="accordion-button collapsed"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapseAdmin"
+              >
+                <i class="bi bi-person-badge me-2"></i> Admin Role
+              </button>
+            </h2>
+            <div
+              id="collapseAdmin"
+              class="accordion-collapse collapse"
+              data-bs-parent="#testingAccordion"
+            >
+              <div class="accordion-body">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="admin1" />
+                  <label class="form-check-label" for="admin1">
+                    <strong>Dashboard:</strong> Verify all counters (Students,
+                    Teachers, Classes) match database records.
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="admin2" />
+                  <label class="form-check-label" for="admin2">
+                    <strong>Faculty Approval:</strong> Approve a pending teacher
+                    and verify their status changes to Active.
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="admin3" />
+                  <label class="form-check-label" for="admin3">
+                    <strong>Student Management:</strong> Edit a student's
+                    details and verify changes persist.
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Teacher -->
+          <div class="accordion-item">
+            <h2 class="accordion-header">
+              <button
+                class="accordion-button collapsed"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapseTeacher"
+              >
+                <i class="bi bi-book me-2"></i> Teacher Role
+              </button>
+            </h2>
+            <div
+              id="collapseTeacher"
+              class="accordion-collapse collapse"
+              data-bs-parent="#testingAccordion"
+            >
+              <div class="accordion-body">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="teach1" />
+                  <label class="form-check-label" for="teach1">
+                    <strong>Create Class:</strong> Create a new class and verify
+                    it appears in the list.
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="teach2" />
+                  <label class="form-check-label" for="teach2">
+                    <strong>Excel Upload:</strong> Upload a valid grade sheet
+                    and verify grades are parsed correctly.
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="teach3" />
+                  <label class="form-check-label" for="teach3">
+                    <strong>Manual Edit:</strong> Change a grade manually and
+                    verify the "Transmuted" grade updates automatically.
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Student -->
+          <div class="accordion-item">
+            <h2 class="accordion-header">
+              <button
+                class="accordion-button collapsed"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapseStudent"
+              >
+                <i class="bi bi-mortarboard me-2"></i> Student Role
+              </button>
+            </h2>
+            <div
+              id="collapseStudent"
+              class="accordion-collapse collapse"
+              data-bs-parent="#testingAccordion"
+            >
+              <div class="accordion-body">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="stud1" />
+                  <label class="form-check-label" for="stud1">
+                    <strong>Join Class:</strong> Join a class using a valid code
+                    and verify enrollment.
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="stud2" />
+                  <label class="form-check-label" for="stud2">
+                    <strong>View Grades:</strong> Verify that grades uploaded by
+                    the teacher are visible.
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="stud3" />
+                  <label class="form-check-label" for="stud3">
+                    <strong>Print Report:</strong> Generate a print preview of
+                    the grade report.
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
     </main>
 
-    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral" });
+    </script>
+
     <script>
-      // Smooth scrolling for sidebar links
+      // Smooth scrolling
       document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
         anchor.addEventListener("click", function (e) {
           e.preventDefault();
           document.querySelector(this.getAttribute("href")).scrollIntoView({
             behavior: "smooth",
           });
-
-          // Update active state
           document
             .querySelectorAll(".nav-link")
             .forEach((link) => link.classList.remove("active"));

@@ -1,34 +1,7 @@
 <?php
 session_start();
 require 'db_connect.php';
-require 'PHPMailer-7.0.0/src/PHPMailer.php';
-require 'PHPMailer-7.0.0/src/SMTP.php';
-require 'PHPMailer-7.0.0/src/Exception.php';
-
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
-function sendResetOTP($email, $otp) {
-    $mail = new PHPMailer(true);
-    try {
-        $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';
-        $mail->SMTPAuth   = true;
-        $mail->Username   = 'kevinselibio10@gmail.com'; 
-        $mail->Password   = 'ruxmlcupgdicyywc';   
-        $mail->SMTPSecure = 'tls';
-        $mail->Port       = 587;
-        $mail->setFrom('kevinselibio10@gmail.com', 'KLD Grade System');
-        $mail->addAddress($email);
-        $mail->isHTML(true);
-        $mail->Subject = 'Password Reset Code';
-        $mail->Body    = "Your password reset code is <b>$otp</b>. Expires in 10 minutes.";
-        $mail->send();
-        return true;
-    } catch (Exception $e) {
-        return false;
-    }
-}
+require 'email_helper.php';
 
 $step = $_GET['step'] ?? '1';
 $error = '';
@@ -50,8 +23,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['request_reset'])) {
         $stmtOtp->execute();
         
         $_SESSION['reset_email'] = $email;
-        if (sendResetOTP($email, $otp)) {
-            header("Location: forgot.php?step=2");
+        
+        $subject = 'Password Reset Code';
+        $body = "Your password reset code is <b>$otp</b>. Expires in 10 minutes.";
+        
+        if (sendEmail($email, $subject, $body)) {
+            header("Location: forgot_password.php?step=2");
             exit();
         } else {
             $error = "Failed to send email.";
@@ -72,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['verify_otp'])) {
     $stmt->execute();
     if ($stmt->get_result()->num_rows > 0) {
         $_SESSION['reset_verified'] = true;
-        header("Location: forgot.php?step=3");
+        header("Location: forgot_password.php?step=3");
         exit();
     } else {
         $error = "Invalid or expired OTP.";
@@ -82,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['verify_otp'])) {
 // Step 3: Reset Password
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['reset_password'])) {
     if (!isset($_SESSION['reset_verified']) || !$_SESSION['reset_verified']) {
-        header("Location: forgot.php");
+        header("Location: forgot_password.php");
         exit();
     }
     
@@ -90,7 +67,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['reset_password'])) {
     $confirm = $_POST['confirm_password'];
     $email = $_SESSION['reset_email'];
     
-    if ($pass === $confirm) {
+    if (strlen($pass) < 8) {
+        $error = "Password must be at least 8 characters long.";
+    } elseif (!preg_match('/[A-Z]/', $pass) || !preg_match('/[a-z]/', $pass) || !preg_match('/[0-9]/', $pass)) {
+        $error = "Password must contain at least one uppercase letter, one lowercase letter, and one number.";
+    } elseif ($pass !== $confirm) {
+        $error = "Passwords do not match.";
+    } else {
         $hashed = password_hash($pass, PASSWORD_DEFAULT);
         $stmt = $conn->prepare("UPDATE users SET password_hash = ? WHERE email = ?");
         $stmt->bind_param("ss", $hashed, $email);
@@ -101,8 +84,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['reset_password'])) {
         session_destroy();
         
         echo "<script>alert('Password reset successful! Please login.'); window.location.href='login.php';</script>";
-    } else {
-        $error = "Passwords do not match.";
     }
 }
 ?>

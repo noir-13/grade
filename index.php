@@ -169,7 +169,7 @@
         }
     </style>
 </head>
-<body style="display: flex; flex-direction: column; min-height: 100vh;">
+<body class="home" style="display: flex; flex-direction: column; min-height: 100vh;">
 
     <?php include 'navbar.php'; ?>
 

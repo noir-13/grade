@@ -14,23 +14,34 @@ $full_name = $_SESSION['full_name'];
 require 'check_profile.php';
 
 
-// Fetch Grades
-$stmt = $conn->prepare("SELECT * FROM grades WHERE student_id = ? ORDER BY created_at DESC");
+// Fetch Grades with Units
+$stmt = $conn->prepare("
+    SELECT g.*, c.units 
+    FROM grades g 
+    LEFT JOIN classes c ON g.class_id = c.id 
+    WHERE g.student_id = ? 
+    ORDER BY g.created_at DESC
+");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $result = $stmt->get_result();
 
 $grades = [];
-$total_grade = 0;
-$count = 0;
+$total_grade_points = 0;
+$total_units = 0;
 
 while ($row = $result->fetch_assoc()) {
     $grades[] = $row;
-    $total_grade += $row['grade'];
-    $count++;
+    $units = intval($row['units'] ?? 3); // Default to 3 if missing
+    $gradeVal = floatval($row['grade']);
+    
+    if ($gradeVal > 0) {
+        $total_grade_points += ($gradeVal * $units);
+        $total_units += $units;
+    }
 }
 
-$gpa = $count > 0 ? number_format($total_grade / $count, 2) : 'N/A';
+$gwa = $total_units > 0 ? number_format($total_grade_points / $total_units, 2) : 'N/A';
 ?>
 
 <!DOCTYPE html>
@@ -113,8 +124,8 @@ $gpa = $count > 0 ? number_format($total_grade / $count, 2) : 'N/A';
                     <p class="vds-text-lead mb-0" style="color: rgba(255,255,255,0.8);">Track your academic progress and stay updated.</p>
                 </div>
                 <div class="stat-card">
-                    <span class="d-block text-uppercase small letter-spacing-2 mb-1" style="opacity: 0.8;">Average GPA</span>
-                    <span class="d-block display-4 fw-bold"><?php echo $gpa; ?></span>
+                    <span class="d-block text-uppercase small letter-spacing-2 mb-1" style="opacity: 0.8;">GWA</span>
+                    <span class="d-block display-4 fw-bold"><?php echo $gwa; ?></span>
                 </div>
             </div>
         </div>
@@ -142,13 +153,13 @@ $gpa = $count > 0 ? number_format($total_grade / $count, 2) : 'N/A';
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="vds-card p-4 action-card text-center" style="opacity: 0.7;">
+                <div class="vds-card p-4 action-card text-center">
                     <div class="icon-box mx-auto" style="background: #f3f4f6; color: #6b7280;">
                         <i class="bi bi-calendar-week-fill"></i>
                     </div>
                     <h3 class="vds-h3">Class Schedule</h3>
                     <p class="vds-text-muted mb-4">View your upcoming classes and examination schedules.</p>
-                    <button class="vds-btn vds-btn-secondary w-100" disabled>Coming Soon</button>
+                    <a href="student_schedule.php" class="vds-btn vds-btn-secondary w-100">View Schedule</a>
                 </div>
             </div>
         </div>

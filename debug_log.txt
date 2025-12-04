@@ -753,3 +753,44 @@ Class Program: BSIS
 Student ID: 144
 Student Program: BSIS
 2025-12-04 14:42:21 - Action: get_classes
+2025-12-04 15:04:53 - Action: get_classes
+2025-12-04 15:04:53 - Action: get_profile
+2025-12-04 15:04:53 - Action: get_programs
+2025-12-04 15:04:54 - Action: get_class_students
+2025-12-04 15:05:05 - Action: validate_students
+2025-12-04 15:05:18 - Action: bulk_upload_grades
+2025-12-04 15:06:06 - Action: validate_students
+2025-12-04 15:06:10 - Action: bulk_upload_grades
+2025-12-04 15:23:55 - Action: get_institutes
+2025-12-04 15:24:03 - Action: get_institutes
+2025-12-04 15:24:23 - Action: get_programs
+2025-12-04 15:24:35 - Action: get_classes
+2025-12-04 15:24:57 - Action: get_classes
+2025-12-04 15:25:00 - Action: join_class
+Join Class Debug:
+Class ID: 7
+Class Program: BSIS
+Student ID: 145
+Student Program: BSIS
+2025-12-04 15:25:00 - Action: get_classes
+2025-12-04 16:12:17 - Action: get_profile
+2025-12-04 16:12:17 - Action: get_classes
+2025-12-04 16:12:17 - Action: get_programs
+2025-12-04 16:12:42 - Action: create_class
+2025-12-04 16:12:42 - Action: get_classes
+2025-12-04 16:12:47 - Action: get_class_students
+2025-12-04 16:12:49 - Action: get_class_students
+2025-12-04 16:12:52 - Action: get_profile
+2025-12-04 16:12:52 - Action: get_classes
+2025-12-04 16:12:52 - Action: get_programs
+2025-12-04 16:12:53 - Action: get_class_students
+2025-12-04 16:13:02 - Action: validate_students
+2025-12-04 16:13:07 - Action: bulk_upload_grades
+2025-12-04 16:13:36 - Action: get_classes
+2025-12-04 16:14:01 - Action: join_class
+Join Class Debug:
+Class ID: 8
+Class Program: BSIS
+Student ID: 145
+Student Program: BSIS
+2025-12-04 16:14:01 - Action: get_classes

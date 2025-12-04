@@ -1,10 +1,6 @@
 <?php
 require_once 'includes/session_config.php';
 
-/**
- * Generates a CSRF token if one doesn't exist.
- * @return string The CSRF token.
- */
 function generate_csrf_token() {
     if (empty($_SESSION['csrf_token'])) {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));

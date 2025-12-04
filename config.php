@@ -39,4 +39,4 @@ defined('SMTP_USER') or define('SMTP_USER', '');
 defined('SMTP_PASS') or define('SMTP_PASS', '');
 defined('SMTP_FROM_EMAIL') or define('SMTP_FROM_EMAIL', '');
 defined('SMTP_FROM_NAME') or define('SMTP_FROM_NAME', 'KLD Grade System');
-?>
+

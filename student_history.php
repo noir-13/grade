@@ -56,11 +56,15 @@ $total_grade_points = 0;
 $total_units = 0;
 $total_count = 0;
 
+$total_subjects_count = 0;
+
 foreach ($grades_by_semester as $semester => $grades) {
     foreach ($grades as $grade) {
         $units = intval($grade['units'] ?? 3); // Default to 3 if missing
         $gradeVal = floatval($grade['grade']);
         
+        $total_subjects_count++;
+
         // Only include valid grades in GWA (exclude dropped/inc if necessary, but assuming all numeric grades count)
         if ($gradeVal > 0) {
             $total_grade_points += ($gradeVal * $units);
@@ -96,13 +100,42 @@ $overall_gwa = $total_units > 0 ? number_format($total_grade_points / $total_uni
             text-align: center;
         }
         @media print {
-            @page { size: A4; margin: 10mm; }
-            body { background: white !important; }
+            @page { size: A4; margin: 15mm; }
+            body { 
+                background: white !important; 
+                font-family: 'Times New Roman', Times, serif; /* Formal font for print */
+                color: black !important;
+            }
             .vds-container { max-width: 100% !important; width: 100% !important; padding: 0 !important; }
-            .vds-card { box-shadow: none !important; border: 1px solid #eee !important; }
-            .semester-header { background: #0f4c3a !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .vds-card { 
+                box-shadow: none !important; 
+                border: none !important; 
+                padding: 0 !important;
+                margin-bottom: 20px !important;
+            }
+            .semester-header { 
+                background: none !important; 
+                color: black !important; 
+                border-bottom: 2px solid #000;
+                padding: 10px 0 !important;
+                border-radius: 0 !important;
+            }
+            .semester-header h3, .semester-header h2, .semester-header p, .semester-header span {
+                color: black !important;
+            }
             .table-responsive { overflow: visible !important; }
+            .vds-table th { 
+                background-color: #f0f0f0 !important; 
+                color: black !important; 
+                border: 1px solid #000 !important;
+            }
+            .vds-table td {
+                border: 1px solid #000 !important;
+            }
             .d-print-none { display: none !important; }
+            
+            /* Hide URL and date headers/footers added by browser if possible */
+            a[href]:after { content: none !important; }
         }
     </style>
 </head>
@@ -170,7 +203,7 @@ $overall_gwa = $total_units > 0 ? number_format($total_grade_points / $total_uni
                 <div class="col-md-3">
                     <div class="vds-card p-4 text-center">
                         <i class="bi bi-journal-bookmark display-4 mb-2" style="color: #0284c7;"></i>
-                        <h3 class="vds-h3 mb-1"><?php echo $total_count; ?></h3>
+                        <h3 class="vds-h3 mb-1"><?php echo $total_subjects_count; ?></h3>
                         <p class="vds-text-muted mb-0">Total Subjects</p>
                     </div>
                 </div>

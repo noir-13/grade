@@ -2,6 +2,10 @@
 session_start();
 require 'db_connect.php';
 require 'email_helper.php';
+require 'csrf_helper.php';
+
+// Generate CSRF token
+generate_csrf_token();
 
 // Helper: Send OTP (Wrapper for email_helper)
 function sendOTP($email, $otp) {
@@ -49,6 +53,9 @@ $success = '';
 
 // --- STEP 1: Email & Password ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register_step1'])) {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+        die("Invalid CSRF Token");
+    }
     $email = trim($_POST['email']);
     $password = $_POST['password'];
     $confirm = $_POST['confirm_password'];
@@ -130,6 +137,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register_step1'])) {
 
 // --- STEP 2: Verify OTP ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['verify_otp'])) {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+        die("Invalid CSRF Token");
+    }
     $entered_otp = trim($_POST['otp']);
     $email = $_SESSION['verify_email'] ?? '';
 
@@ -164,6 +174,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['verify_otp'])) {
 
 // --- Resend OTP Handler ---
 if (isset($_POST['resend_otp'])) {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+        die("Invalid CSRF Token");
+    }
     $email = $_SESSION['verify_email'] ?? '';
     if ($email) {
         $otp = rand(100000, 999999);
@@ -183,6 +196,9 @@ if (isset($_POST['resend_otp'])) {
 
 // --- STEP 3: Complete Profile ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['complete_profile'])) {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+        die("Invalid CSRF Token");
+    }
     $email = $_SESSION['verify_email'] ?? '';
     if (empty($email)) {
         header("Location: login.php");
@@ -241,7 +257,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['complete_profile'])) {
                     $curr_id = $stmtCurr->get_result()->fetch_assoc()['id'];
                     
                     // Migrate Data
-                    $conn->query("UPDATE enrollments SET student_id = $curr_id WHERE student_id = $ghost_id");
+                    // Use UPDATE IGNORE to handle cases where the user is already enrolled in the same class
+                    $conn->query("UPDATE IGNORE enrollments SET student_id = $curr_id WHERE student_id = $ghost_id");
+                    // Delete any remaining ghost enrollments (duplicates that weren't updated)
+                    $conn->query("DELETE FROM enrollments WHERE student_id = $ghost_id");
+                    
                     $conn->query("UPDATE grades SET student_id = $curr_id WHERE student_id = $ghost_id");
                     
                     // Delete Ghost
@@ -320,6 +340,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['complete_profile'])) {
                 <?php if($error): ?><div class="vds-pill vds-pill-fail mb-4 w-100 justify-content-center"><?php echo $error; ?></div><?php endif; ?>
                 
                 <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                     <div class="vds-form-group">
                         <label class="vds-label">KLD Email</label>
                         <input type="email" name="email" class="vds-input" placeholder="student@kld.edu.ph" required>
@@ -345,6 +366,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['complete_profile'])) {
                 <?php if($success): ?><div class="vds-pill vds-pill-pass mb-4 w-100 justify-content-center"><?php echo $success; ?></div><?php endif; ?>
 
                 <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                     <div class="vds-form-group">
                         <input type="text" name="otp" class="vds-input text-center" style="font-size: 1.5rem; letter-spacing: 5px;" placeholder="######" maxlength="6" required>
                     </div>
@@ -352,6 +374,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['complete_profile'])) {
                 </form>
                 
                 <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                     <button type="submit" name="resend_otp" class="vds-btn vds-btn-secondary w-100 mt-3">Resend Code</button>
                 </form>
 
@@ -364,6 +387,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['complete_profile'])) {
                 <?php if($error): ?><div class="vds-pill vds-pill-fail mb-4 w-100 justify-content-center"><?php echo $error; ?></div><?php endif; ?>
 
                 <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                     <div class="vds-form-group">
                         <label class="vds-label">Role</label>
                         <select name="role" id="roleSelect" class="vds-select" required>

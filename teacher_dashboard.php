@@ -25,64 +25,7 @@ require 'check_profile.php';
     <!-- SheetJS for Excel Parsing -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <style>
-        .dashboard-header {
-            background: linear-gradient(135deg, var(--vds-forest), #0f4c3a);
-            color: white;
-            border-radius: 24px;
-            padding: 3rem;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 20px 40px rgba(13, 59, 46, 0.15);
-        }
-        
-        .dashboard-header::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -10%;
-            width: 300px;
-            height: 300px;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            border-radius: 50%;
-        }
-
-        .action-card {
-            height: 100%;
-            transition: all 0.3s ease;
-            border: 1px solid transparent;
-        }
-
-        .action-card:hover {
-            transform: translateY(-5px);
-            border-color: var(--vds-sage);
-            box-shadow: 0 15px 30px rgba(0,0,0,0.05);
-        }
-
-        .icon-box {
-            width: 60px;
-            height: 60px;
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .vds-file-drop {
-            border: 2px dashed var(--vds-sage);
-            border-radius: 16px;
-            padding: 3rem;
-            text-align: center;
-            background: rgba(255,255,255,0.5);
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-
-        .vds-file-drop:hover {
-            border-color: var(--vds-forest);
-            background: rgba(13, 59, 46, 0.05);
-        }
+        /* Styles moved to verdantDesignSystem.css */
     </style>
 </head>
 <body class="vds-bg-vapor">

@@ -26,6 +26,7 @@ while ($row = $result->fetch_assoc()) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Upload Grades | KLD Grade System</title>
+    <meta name="csrf-token" content="<?php echo $_SESSION['csrf_token']; ?>">
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="verdantDesignSystem.css">
@@ -79,40 +80,49 @@ while ($row = $result->fetch_assoc()) {
         <!-- Step 1: Select Class -->
         <div class="vds-card p-4 mb-4">
             <h2 class="vds-h3 mb-3"><i class="bi bi-info-circle me-2"></i>Step 1: Select Class</h2>
-            <div class="row g-3">
-                <div class="col-md-12">
-                    <label class="vds-label">Select Class to Upload Grades For <span class="text-danger">*</span></label>
-                    <select id="classSelect" class="vds-input">
-                        <option value="">-- Select a Class --</option>
-                        <?php foreach ($classes as $class): ?>
-                            <option value="<?php echo $class['id']; ?>" 
-                                data-section="<?php echo htmlspecialchars($class['section']); ?>"
-                                data-subject-code="<?php echo htmlspecialchars($class['subject_code']); ?>"
-                                data-subject-name="<?php echo htmlspecialchars($class['subject_description']); ?>"
-                                data-semester="<?php echo htmlspecialchars($class['semester']); ?>"
-                                data-units="<?php echo htmlspecialchars($class['units'] ?? 3); ?>"
-                                <?php echo ($class_id_param == $class['id']) ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($class['subject_description'] . ' (' . $class['subject_code'] . ') - ' . $class['section']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <small class="text-muted">Only classes you have created are shown here.</small>
-                </div>
-                <div class="col-md-12 mt-3">
-                    <label class="vds-label">Grading Period <span class="text-danger">*</span></label>
-                    <select id="gradingPeriod" class="vds-input">
-                        <option value="midterm">Midterm Grade</option>
-                        <option value="final">Final Grade</option>
-                        <option value="grade" selected>Semestral Grade (Final Rating)</option>
-                    </select>
-                </div>
-            </div>
             
-            <!-- Hidden Fields for Compatibility -->
-            <input type="hidden" id="section">
-            <input type="hidden" id="subjectCode">
-            <input type="hidden" id="subjectName">
-            <input type="hidden" id="semester">
+            <?php if (empty($classes)): ?>
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>No Classes Found.</strong> You need to create a class before you can upload grades. 
+                    <a href="teacher_dashboard.php" class="alert-link">Go to Dashboard</a>
+                </div>
+            <?php else: ?>
+                <div class="row g-3">
+                    <div class="col-md-12">
+                        <label class="vds-label">Select Class to Upload Grades For <span class="text-danger">*</span></label>
+                        <select id="classSelect" class="vds-input">
+                            <option value="">-- Select a Class --</option>
+                            <?php foreach ($classes as $class): ?>
+                                <option value="<?php echo $class['id']; ?>" 
+                                    data-section="<?php echo htmlspecialchars($class['section']); ?>"
+                                    data-subject-code="<?php echo htmlspecialchars($class['subject_code']); ?>"
+                                    data-subject-name="<?php echo htmlspecialchars($class['subject_description']); ?>"
+                                    data-semester="<?php echo htmlspecialchars($class['semester']); ?>"
+                                    data-units="<?php echo htmlspecialchars($class['units'] ?? 3); ?>"
+                                    <?php echo ($class_id_param == $class['id']) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($class['subject_description'] . ' (' . $class['subject_code'] . ') - ' . $class['section']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted">Only classes you have created are shown here.</small>
+                    </div>
+                    <div class="col-md-12 mt-3">
+                        <label class="vds-label">Grading Period <span class="text-danger">*</span></label>
+                        <select id="gradingPeriod" class="vds-input">
+                            <option value="midterm">Midterm Grade</option>
+                            <option value="final">Final Grade</option>
+                            <option value="grade" selected>Semestral Grade (Final Rating)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Hidden Fields for Compatibility -->
+                <input type="hidden" id="section">
+                <input type="hidden" id="subjectCode">
+                <input type="hidden" id="subjectName">
+                <input type="hidden" id="semester">
+            <?php endif; ?>
         </div>
 
         <!-- Step 2: Upload Excel File -->
@@ -141,7 +151,13 @@ while ($row = $result->fetch_assoc()) {
                     <h3 class="vds-h3 mb-1"><i class="bi bi-table me-2"></i>Step 3: Preview & Validate</h3>
                     <p class="vds-text-muted mb-0" id="previewSummary">Review your data before uploading</p>
                 </div>
-                <div>
+                <div class="d-flex align-items-center">
+                    <div class="form-check me-3">
+                        <input class="form-check-input" type="checkbox" id="createGhostsCheck" checked>
+                        <label class="form-check-label" for="createGhostsCheck">
+                            Create accounts for new students
+                        </label>
+                    </div>
                     <button id="validateBtn" class="vds-btn vds-btn-secondary me-2">
                         <i class="bi bi-shield-check me-1"></i>Validate Students
                     </button>
@@ -219,13 +235,14 @@ while ($row = $result->fetch_assoc()) {
             if (raw >= 82) return ['2.25', 'Passed'];
             if (raw >= 79) return ['2.50', 'Passed'];
             if (raw >= 76) return ['2.75', 'Passed'];
-            if (raw >= 76) return ['2.75', 'Passed'];
             if (raw >= 70) return ['3.00', 'Passed'];
             return ['5.00', 'Failed'];
         }
 
         // Initialize state based on selection
         function updateClassState() {
+            if (!classSelect) return;
+            
             const selectedOption = classSelect.options[classSelect.selectedIndex];
             if (selectedOption.value) {
                 currentClassId = selectedOption.value;
@@ -243,6 +260,8 @@ while ($row = $result->fetch_assoc()) {
                 previewContainer.style.display = 'none';
             }
         }
+            
+        
 
         classSelect.addEventListener('change', updateClassState);
         
@@ -307,9 +326,33 @@ while ($row = $result->fetch_assoc()) {
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 parsedData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
                 
-                // Remove header row if it exists
-                if (parsedData.length > 0) {
-                    parsedData = parsedData.slice(1);
+                // Smart Parsing: Find header row
+                let headerRowIndex = -1;
+                for (let i = 0; i < Math.min(parsedData.length, 20); i++) {
+                    const row = parsedData[i];
+                    if (!row || row.length === 0) continue;
+                    
+                    const rowStr = JSON.stringify(row).toLowerCase();
+                    // Look for standard headers
+                    if (rowStr.includes('student id') || (rowStr.includes('id') && rowStr.includes('grade'))) {
+                        headerRowIndex = i;
+                        break;
+                    }
+                }
+
+                if (headerRowIndex !== -1) {
+                    parsedData = parsedData.slice(headerRowIndex + 1);
+                } else {
+                    // Fallback: Look for the first row that looks like data (starts with a number)
+                    let dataStartIndex = 0;
+                    for (let i = 0; i < Math.min(parsedData.length, 20); i++) {
+                         const firstCell = parsedData[i][0];
+                         if (firstCell && typeof firstCell === 'string' && /^\d/.test(firstCell)) {
+                             dataStartIndex = i;
+                             break;
+                         }
+                    }
+                    parsedData = parsedData.slice(dataStartIndex);
                 }
 
                 renderPreview(parsedData);
@@ -434,7 +477,7 @@ while ($row = $result->fetch_assoc()) {
                 Total: <strong>${total}</strong> | 
                 Valid: <strong class="text-success">${valid}</strong> | 
                 Error: <strong class="text-danger">${invalid}</strong> | 
-                Auto-Enroll: <strong class="text-info">${duplicates}</strong>
+                Not Enrolled: <strong class="text-info">${duplicates}</strong>
             `;
         }
 
@@ -458,8 +501,36 @@ while ($row = $result->fetch_assoc()) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         student_ids: studentIds,
-                        class_id: currentClassId 
+                        class_id: currentClassId,
+                        create_ghosts: document.getElementById('createGhostsCheck').checked,
+                        csrf_token: document.querySelector('meta[name="csrf-token"]').content
                     })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    validationResults = {};
+                    
+                    // Populate validation results
+                    if (result.valid) {
+                        result.valid.forEach(item => {
+                            validationResults[item.school_id] = {
+                                valid: true,
+                                status: item.status || 'valid',
+                                name: item.name || 'New Student'
+                            };
+                        });
+                    }
+                    if (result.invalid) {
+                        result.invalid.forEach(item => {
+                            validationResults[item.school_id] = {
+                                valid: false,
+                                status: 'invalid',
+                                error: item.error
+                            };
+                        });
+                    }
                     if (result.not_enrolled) {
                         result.not_enrolled.forEach(school_id => {
                             validationResults[school_id] = {
@@ -488,10 +559,11 @@ while ($row = $result->fetch_assoc()) {
                                 rowElem.className = 'row-valid';
                                 validCount++;
                             } else if (res.status === 'not_enrolled') {
-                                statusIcon.className = 'bi bi-person-plus-fill validation-icon text-info';
-                                nameCell.textContent = 'Will Auto-Enroll';
-                                rowElem.className = 'row-duplicate'; // Using duplicate style for auto-enroll
-                                autoEnrollCount++;
+                                statusIcon.className = 'bi bi-info-circle-fill validation-icon text-info';
+                                nameCell.textContent = 'Not Enrolled (Grade will be saved)';
+                                rowElem.className = 'row-duplicate'; 
+                                validCount++; // Treat as valid for button enablement
+                                autoEnrollCount++; // Show in summary
                             } else if (res.status === 'ghost_create') {
                                 statusIcon.className = 'bi bi-person-badge-fill validation-icon text-warning';
                                 nameCell.textContent = 'Will Create Ghost Account';
@@ -503,10 +575,38 @@ while ($row = $result->fetch_assoc()) {
                                 rowElem.className = 'row-invalid';
                                 errorCount++;
                             }
+                        } else {
+                            // If ID was not sent for validation (e.g., empty or invalid format)
+                            const idRegex = /^\d{4}-\d{1}-\d{6}$/;
+                            if (!schoolId || !idRegex.test(schoolId)) {
+                                statusIcon.className = 'bi bi-exclamation-triangle-fill validation-icon text-warning';
+                                statusIcon.title = 'Invalid ID Format (xxxx-x-xxxxxx)';
+                                nameCell.textContent = '-';
+                                rowElem.className = 'row-invalid';
+                                errorCount++;
+                            } else {
+                                // Should not happen if all valid IDs are sent
+                                statusIcon.className = 'bi bi-question-circle validation-icon text-muted';
+                                statusIcon.title = 'Pending Validation';
+                                nameCell.textContent = '-';
+                                rowElem.className = '';
+                            }
                         }
                     });
 
                     updateSummary(parsedData.length, validCount, errorCount, autoEnrollCount);
+
+                    // Error Rate Check
+                    const errorRate = (errorCount / parsedData.length) * 100;
+                    if (errorRate > 20) {
+                        Swal.fire({
+                            title: 'High Error Rate Detected',
+                            text: `It looks like ${Math.round(errorRate)}% of the rows are invalid. Are you sure this is the correct file?`,
+                            icon: 'warning',
+                            confirmButtonColor: '#d33',
+                            confirmButtonText: 'I understand, proceed'
+                        });
+                    }
 
                     if (validCount > 0 || autoEnrollCount > 0) {
                         publishBtn.disabled = false;
@@ -529,45 +629,55 @@ while ($row = $result->fetch_assoc()) {
 
         // Publish Grades
         publishBtn.addEventListener('click', async () => {
-            if (!currentClassId) {
-                Swal.fire({ icon: 'warning', title: 'Warning', text: 'Please select a class first.' });
-                return;
-            }
-
-            const section = sectionInput.value;
-            const subjectCode = subjectCodeInput.value;
-            const subjectName = subjectNameInput.value;
-            const semester = semesterInput.value;
-            const gradingPeriod = gradingPeriodSelect.value;
-            const gradingPeriodText = gradingPeriodSelect.options[gradingPeriodSelect.selectedIndex].text;
-
-            // Check for invalid grades
-            const hasInvalidGrades = parsedData.some(row => {
-                const grade = parseFloat(row[1]);
-                return isNaN(grade) || grade < 0 || grade > 100;
-            });
-
-            if (hasInvalidGrades) {
-                Swal.fire({ icon: 'error', title: 'Invalid Grades', text: 'Some grades are invalid (must be 0-100). Please correct them before publishing.' });
-                return;
-            }
-
-            const result = await Swal.fire({
-                title: 'Confirm Upload?',
-                html: `Class: ${subjectCode} - ${section}<br>Period: <strong>${gradingPeriodText}</strong><br>Total Records: ${parsedData.length}<br><br>This will save/update grades in the database.`,
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#0D3B2E',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Yes, Upload'
-            });
-
-            if (!result.isConfirmed) return;
-
-            publishBtn.disabled = true;
-            publishBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Publishing...';
-
             try {
+                console.log('Publish button clicked');
+                
+                if (!currentClassId) {
+                    console.warn('No class selected');
+                    Swal.fire({ icon: 'warning', title: 'Warning', text: 'Please select a class first.' });
+                    return;
+                }
+
+                const section = sectionInput.value;
+                const subjectCode = subjectCodeInput.value;
+                const subjectName = subjectNameInput.value;
+                const semester = semesterInput.value;
+                const gradingPeriod = gradingPeriodSelect.value;
+                const gradingPeriodText = gradingPeriodSelect.options[gradingPeriodSelect.selectedIndex].text;
+
+                console.log('Publishing for:', { section, subjectCode, gradingPeriod, count: parsedData.length });
+
+                if (!parsedData || parsedData.length === 0) {
+                     Swal.fire({ icon: 'warning', title: 'No Data', text: 'No grade data to publish.' });
+                     return;
+                }
+
+                // Check for invalid grades
+                const hasInvalidGrades = parsedData.some(row => {
+                    const grade = parseFloat(row[1]);
+                    return isNaN(grade) || grade < 0 || grade > 100;
+                });
+
+                if (hasInvalidGrades) {
+                    Swal.fire({ icon: 'error', title: 'Invalid Grades', text: 'Some grades are invalid (must be 0-100). Please correct them before publishing.' });
+                    return;
+                }
+
+                const result = await Swal.fire({
+                    title: 'Confirm Upload?',
+                    html: `Class: ${subjectCode} - ${section}<br>Period: <strong>${gradingPeriodText}</strong><br>Total Records: ${parsedData.length}<br><br>This will save/update grades in the database.`,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonColor: '#0D3B2E',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Yes, Upload'
+                });
+
+                if (!result.isConfirmed) return;
+
+                publishBtn.disabled = true;
+                publishBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Publishing...';
+
                 const response = await fetch('api.php?action=bulk_upload_grades', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -577,19 +687,20 @@ while ($row = $result->fetch_assoc()) {
                         subject_code: subjectCode,
                         subject_name: subjectName,
                         semester: semester,
-                        subject_name: subjectName,
-                        semester: semester,
                         class_id: currentClassId,
-                        grading_period: gradingPeriod
+                        grading_period: gradingPeriod,
+                        create_ghosts: document.getElementById('createGhostsCheck').checked,
+                        csrf_token: document.querySelector('meta[name="csrf-token"]').content
                     })
                 });
 
-                const result = await response.json();
+                const resJson = await response.json();
+                console.log('Server response:', resJson);
 
-                if (result.success) {
-                    let msg = `Inserted: ${result.inserted}<br>Updated: ${result.updated}<br>Errors: ${result.errors.length}`;
-                    if (result.auto_enrolled && result.auto_enrolled.length > 0) {
-                        msg += `<br><br>ℹ️ ${result.auto_enrolled.length} students were auto-enrolled.`;
+                if (resJson.success) {
+                    let msg = `Inserted: ${resJson.inserted}<br>Updated: ${resJson.updated}<br>Errors: ${resJson.errors.length}`;
+                    if (resJson.auto_enrolled && resJson.auto_enrolled.length > 0) {
+                        msg += `<br><br>ℹ️ ${resJson.auto_enrolled.length} ghost accounts were created.`;
                     }
                     Swal.fire({
                         title: 'Success!',
@@ -603,10 +714,11 @@ while ($row = $result->fetch_assoc()) {
                     parsedData = [];
                     fileInput.value = '';
                 } else {
-                    Swal.fire({ icon: 'error', title: 'Error', text: result.message });
+                    Swal.fire({ icon: 'error', title: 'Error', text: resJson.message });
                 }
             } catch (error) {
-                Swal.fire({ icon: 'error', title: 'Network Error', text: error.message });
+                console.error('Publish Error:', error);
+                Swal.fire({ icon: 'error', title: 'System Error', text: 'An unexpected error occurred: ' + error.message });
             } finally {
                 publishBtn.disabled = false;
                 publishBtn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Publish Grades';

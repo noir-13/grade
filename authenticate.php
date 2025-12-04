@@ -6,6 +6,10 @@ require 'db_connect.php';
 require 'PHPMailer-7.0.0/src/PHPMailer.php';
 require 'PHPMailer-7.0.0/src/SMTP.php';
 require 'PHPMailer-7.0.0/src/Exception.php';
+require 'csrf_helper.php'; // Include CSRF helper
+
+// Generate CSRF token if not exists
+generate_csrf_token();
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
@@ -27,13 +31,13 @@ function resendOTP($email) {
     $mail = new PHPMailer(true);
     try {
         $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';
+        $mail->Host       = SMTP_HOST;
         $mail->SMTPAuth   = true;
-        $mail->Username   = 'kevinselibio10@gmail.com'; 
-        $mail->Password   = 'ruxmlcupgdicyywc';   
+        $mail->Username   = SMTP_USER; 
+        $mail->Password   = SMTP_PASS;   
         $mail->SMTPSecure = 'tls';
-        $mail->Port       = 587;
-        $mail->setFrom('kevinselibio10@gmail.com', 'KLD Grade System');
+        $mail->Port       = SMTP_PORT;
+        $mail->setFrom(SMTP_FROM_EMAIL, SMTP_FROM_NAME);
         $mail->addAddress($email);
         $mail->isHTML(true);
         $mail->Subject = 'KLD Verification Code';

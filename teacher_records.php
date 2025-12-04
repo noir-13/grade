@@ -13,6 +13,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Class Records | KLD Grade System</title>
+    <meta name="csrf-token" content="<?php echo $_SESSION['csrf_token']; ?>">
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="verdantDesignSystem.css">
@@ -291,7 +292,8 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
                         student_id: studentId,
                         class_id: classId,
                         raw_grade: rawGrade,
-                        remarks: remarks
+                        remarks: remarks,
+                        csrf_token: document.querySelector('meta[name="csrf-token"]').content
                     })
                 });
                 const data = await res.json();

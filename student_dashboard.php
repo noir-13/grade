@@ -18,6 +18,7 @@ require 'check_profile.php';
 $stmt = $conn->prepare("
     SELECT g.*, c.units 
     FROM grades g 
+    JOIN enrollments e ON g.class_id = e.class_id AND e.student_id = g.student_id
     LEFT JOIN classes c ON g.class_id = c.id 
     WHERE g.student_id = ? 
     ORDER BY g.created_at DESC
@@ -54,59 +55,7 @@ $gwa = $total_units > 0 ? number_format($total_grade_points / $total_units, 2) :
     <link href="bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="verdantDesignSystem.css">
     <style>
-        .dashboard-header {
-            background: linear-gradient(135deg, var(--vds-forest), #0f4c3a);
-            color: white;
-            border-radius: 24px;
-            padding: 3rem;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 20px 40px rgba(13, 59, 46, 0.15);
-        }
-        
-        .dashboard-header::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -10%;
-            width: 300px;
-            height: 300px;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            border-radius: 50%;
-        }
-
-        .stat-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 16px;
-            padding: 1.5rem;
-            text-align: center;
-            min-width: 150px;
-        }
-
-        .action-card {
-            height: 100%;
-            transition: all 0.3s ease;
-            border: 1px solid transparent;
-        }
-
-        .action-card:hover {
-            transform: translateY(-5px);
-            border-color: var(--vds-sage);
-            box-shadow: 0 15px 30px rgba(0,0,0,0.05);
-        }
-
-        .icon-box {
-            width: 60px;
-            height: 60px;
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
+        /* Styles moved to verdantDesignSystem.css */
     </style>
 </head>
 <body class="vds-bg-vapor">
@@ -124,15 +73,21 @@ $gwa = $total_units > 0 ? number_format($total_grade_points / $total_units, 2) :
                     <p class="vds-text-lead mb-0" style="color: rgba(255,255,255,0.8);">Track your academic progress and stay updated.</p>
                 </div>
                 <div class="stat-card">
-                    <span class="d-block text-uppercase small letter-spacing-2 mb-1" style="opacity: 0.8;">GWA</span>
-                    <span class="d-block display-4 fw-bold"><?php echo $gwa; ?></span>
+                    <span class="d-block text-uppercase small letter-spacing-2 mb-2" style="opacity: 0.8;">GWA</span>
+                    <div class="position-relative d-inline-flex align-items-center justify-content-center">
+                         <svg width="120" height="120" viewBox="0 0 120 120">
+                            <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8" />
+                            <circle cx="60" cy="60" r="54" fill="none" stroke="#f4d35e" stroke-width="8" stroke-dasharray="339.292" stroke-dashoffset="<?php echo 339.292 * (1 - (floatval($gwa === 'N/A' ? 0 : $gwa) / 5)); ?>" transform="rotate(-90 60 60)" />
+                         </svg>
+                         <span class="position-absolute display-5 fw-bold text-white"><?php echo $gwa; ?></span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div class="row g-4 mb-5">
             <!-- Quick Actions -->
-            <div class="col-md-4">
+            <div class="col-md-4 fade-in-up" style="animation-delay: 0.1s;">
                 <div class="vds-card p-4 action-card text-center">
                     <div class="icon-box mx-auto" style="background: var(--vds-vapor); color: var(--vds-forest);">
                         <i class="bi bi-journal-bookmark-fill"></i>
@@ -142,7 +97,7 @@ $gwa = $total_units > 0 ? number_format($total_grade_points / $total_units, 2) :
                     <a href="student_history.php" class="vds-btn vds-btn-primary w-100">View Grades</a>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-4 fade-in-up" style="animation-delay: 0.2s;">
                 <div class="vds-card p-4 action-card text-center">
                     <div class="icon-box mx-auto" style="background: #e0f2fe; color: #0284c7;">
                         <i class="bi bi-person-badge-fill"></i>
@@ -152,7 +107,7 @@ $gwa = $total_units > 0 ? number_format($total_grade_points / $total_units, 2) :
                     <a href="profile.php" class="vds-btn vds-btn-secondary w-100">Update Profile</a>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-4 fade-in-up" style="animation-delay: 0.3s;">
                 <div class="vds-card p-4 action-card text-center">
                     <div class="icon-box mx-auto" style="background: #f3f4f6; color: #6b7280;">
                         <i class="bi bi-calendar-week-fill"></i>
@@ -165,12 +120,12 @@ $gwa = $total_units > 0 ? number_format($total_grade_points / $total_units, 2) :
         </div>
 
         <!-- Recent Grades -->
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-4 fade-in-up" style="animation-delay: 0.4s;">
             <h3 class="vds-h3 mb-0">Recent Activity</h3>
             <a href="grades.php" class="vds-btn vds-btn-text">View All <i class="bi bi-arrow-right"></i></a>
         </div>
 
-        <div class="vds-card overflow-hidden">
+        <div class="vds-card overflow-hidden fade-in-up" style="animation-delay: 0.5s;">
             <div class="table-responsive">
                 <table class="vds-table mb-0">
                     <thead>
@@ -204,9 +159,12 @@ $gwa = $total_units > 0 ? number_format($total_grade_points / $total_units, 2) :
                         <?php else: ?>
                             <tr>
                                 <td colspan="4" class="text-center p-5">
-                                    <div class="text-muted">
-                                        <i class="bi bi-inbox display-4 d-block mb-3" style="opacity: 0.3;"></i>
-                                        No grades have been posted yet.
+                                    <div class="text-muted py-4">
+                                        <div class="mb-3">
+                                            <i class="bi bi-journal-album display-4 text-secondary opacity-25"></i>
+                                        </div>
+                                        <h4 class="vds-h4 text-muted">No grades yet</h4>
+                                        <p class="small opacity-75">Your recent grades will appear here once posted.</p>
                                     </div>
                                 </td>
                             </tr>

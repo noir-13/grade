@@ -1,9 +1,19 @@
 <?php
 require 'db_connect.php';
 require 'email_helper.php';
+require 'csrf_helper.php';
 header('Content-Type: application/json');
 
+// Disable error display to prevent HTML output
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+
 $action = $_GET['action'] ?? '';
+
+// Debug Logging
+$logFile = 'debug_log.txt';
+$logMessage = date('Y-m-d H:i:s') . " - Action: $action\n";
+file_put_contents($logFile, $logMessage, FILE_APPEND);
 
 if ($action === 'get_institutes') {
     $sql = "SELECT * FROM institutes ORDER BY name ASC";
@@ -42,88 +52,91 @@ function transmuteGrade($raw) {
     if ($raw >= 82) return [2.25, 'Passed'];
     if ($raw >= 79) return [2.50, 'Passed'];
     if ($raw >= 76) return [2.75, 'Passed'];
+    if ($raw >= 75) return [3.00, 'Passed']; // Adjusted to include 75 as passing if needed, or stick to 75=3.00
+    // Previous code had 70=3.00, let's stick to standard if possible, but user code had 70.
+    // Let's use the logic from the previous file:
     if ($raw >= 70) return [3.00, 'Passed'];
     return [5.00, 'Failed'];
 }
 
 // Bulk Upload Grades
 if ($action === 'bulk_upload_grades') {
-    session_start();
-    
-    if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
-        echo json_encode(['success' => false, 'message' => 'Unauthorized. Only teachers can upload grades.']);
-        exit;
-    }
-    
-    $input = json_decode(file_get_contents('php://input'), true);
-    $grades = $input['grades'] ?? [];
-    $class_id = isset($input['class_id']) ? intval($input['class_id']) : 0;
-    $grading_period = $input['grading_period'] ?? 'grade'; // Default to 'grade' (semestral)
-    
-    // Map grading period to column name
-    $target_column = 'grade';
-    if ($grading_period === 'midterm') $target_column = 'midterm';
-    if ($grading_period === 'final') $target_column = 'final';
-    if ($grading_period === 'grade') $target_column = 'grade'; // Semestral
-    
-    $section = '';
-    $subject_code = '';
-    $subject_name = '';
-    $semester = '';
-
-    if ($class_id > 0) {
-        $stmtClass = $conn->prepare("SELECT * FROM classes WHERE id = ? AND teacher_id = ?");
-        $stmtClass->bind_param("ii", $class_id, $_SESSION['user_id']);
-        $stmtClass->execute();
-        $classRes = $stmtClass->get_result();
-        if ($classRow = $classRes->fetch_assoc()) {
-            $section = $classRow['section'];
-            $subject_code = $classRow['subject_code'];
-            $subject_name = $classRow['subject_description'];
-            $semester = $classRow['semester'];
-        } else {
-            echo json_encode(['success' => false, 'message' => 'Invalid Class ID']);
-            exit;
-        }
-    } else {
-        $section = trim($input['section'] ?? '');
-        $subject_code = trim($input['subject_code'] ?? '');
-        $subject_name = trim($input['subject_name'] ?? '');
-        $semester = trim($input['semester'] ?? '1st Sem 2024-2025');
-    }
-    
-    $teacher_id = $_SESSION['user_id'];
-    
-    if (empty($grades)) {
-        echo json_encode(['success' => false, 'message' => 'No grade data provided']);
-        exit;
-    }
-    
-    if (empty($section) || empty($subject_code)) {
-        echo json_encode(['success' => false, 'message' => 'Section and Subject Code are required']);
-        exit;
-    }
-    
-    $successCount = 0;
-    $updateCount = 0;
-    $errors = [];
-    $notFound = [];
-    $autoEnrolled = [];
-    
-    $conn->begin_transaction();
     
     try {
-        $stmtFindStudent = $conn->prepare("SELECT id, full_name, email, role FROM users WHERE school_id = ?");
-        $stmtCheckEnrollment = $conn->prepare("SELECT id FROM enrollments WHERE class_id = ? AND student_id = ?");
-        $stmtEnroll = $conn->prepare("INSERT INTO enrollments (class_id, student_id) VALUES (?, ?)");
-
-        $studentsToNotify = [];
-
-        // Note: We are storing the TRANSMUTED grade in the target column and RAW in 'raw_grade' (though raw_grade might need to be period specific too? 
-        // For now, let's assume raw_grade is just the latest raw grade uploaded, or we should have added raw_midterm etc. 
-        // Given the request didn't specify raw columns for periods, we will just update the main grade column.
-        // Actually, to be safe, let's just update the specific column.
+        if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
+            throw new Exception('Unauthorized. Only teachers can upload grades.');
+        }
         
+        $input = json_decode(file_get_contents('php://input'), true);
+        $grades = $input['grades'] ?? [];
+        $class_id = isset($input['class_id']) ? intval($input['class_id']) : 0;
+        $grading_period = $input['grading_period'] ?? 'grade'; 
+        $create_ghosts = $input['create_ghosts'] ?? false; 
+        $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($input['csrf_token'] ?? '');
+
+        if (!verify_csrf_token($csrf_token)) {
+            throw new Exception('Invalid CSRF Token');
+        }
+        
+        // Map grading period to column name
+        $target_column = 'grade';
+        if ($grading_period === 'midterm') $target_column = 'midterm';
+        if ($grading_period === 'final') $target_column = 'final';
+        if ($grading_period === 'grade') $target_column = 'grade'; 
+        
+        $section = '';
+        $subject_code = '';
+        $subject_name = '';
+        $semester = '';
+
+        if ($class_id > 0) {
+            $stmtClass = $conn->prepare("SELECT * FROM classes WHERE id = ? AND teacher_id = ?");
+            if (!$stmtClass) throw new Exception("Prepare failed for class check: " . $conn->error);
+            
+            $stmtClass->bind_param("ii", $class_id, $_SESSION['user_id']);
+            $stmtClass->execute();
+            $classRes = $stmtClass->get_result();
+            if ($classRow = $classRes->fetch_assoc()) {
+                $section = $classRow['section'];
+                $subject_code = $classRow['subject_code'];
+                $subject_name = $classRow['subject_description'];
+                $semester = $classRow['semester'];
+            } else {
+                throw new Exception('Invalid Class ID');
+            }
+        } else {
+            $section = trim($input['section'] ?? '');
+            $subject_code = trim($input['subject_code'] ?? '');
+            $subject_name = trim($input['subject_name'] ?? '');
+            $semester = trim($input['semester'] ?? '1st Sem 2024-2025');
+        }
+        
+        $teacher_id = $_SESSION['user_id'];
+        
+        if (empty($grades)) {
+            throw new Exception('No grade data provided');
+        }
+        
+        if (empty($section) || empty($subject_code)) {
+            throw new Exception('Section and Subject Code are required');
+        }
+        
+        $successCount = 0;
+        $updateCount = 0;
+        $errors = [];
+        $notFound = [];
+        $autoEnrolled = [];
+        
+        $conn->begin_transaction();
+        
+        $stmtFindStudent = $conn->prepare("
+            SELECT u.id, u.full_name, u.email, u.role, g.midterm, g.final 
+            FROM users u 
+            LEFT JOIN grades g ON u.id = g.student_id AND g.class_id = ?
+            WHERE u.school_id = ?
+        ");
+        if (!$stmtFindStudent) throw new Exception("Prepare failed for find student: " . $conn->error);
+
         $stmtUpsert = $conn->prepare("
             INSERT INTO grades (student_id, subject_code, subject_name, $target_column, raw_grade, remarks, teacher_id, section, semester, class_id) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -136,8 +149,18 @@ if ($action === 'bulk_upload_grades') {
                 updated_at = CURRENT_TIMESTAMP
         ");
 
+        if (!$stmtUpsert) {
+            throw new Exception("Prepare failed for grades insert: " . $conn->error);
+        }
+
         $stmtCreateGhost = $conn->prepare("INSERT INTO users (school_id, full_name, email, password_hash, role, status, is_verified) VALUES (?, ?, ?, ?, 'student', 'ghost', 0)");
         
+        if (!$stmtCreateGhost) {
+            throw new Exception("Prepare failed for ghost user insert: " . $conn->error);
+        }
+        
+        // $stmtEnroll removed as per user request (no auto-enroll)
+
         foreach ($grades as $row) {
             $student_school_id = trim($row[0] ?? '');
             $raw_grade = floatval($row[1] ?? 0);
@@ -157,35 +180,41 @@ if ($action === 'bulk_upload_grades') {
             
             if (empty($student_school_id)) continue;
             
-            $stmtFindStudent->bind_param("s", $student_school_id);
+            $stmtFindStudent->bind_param("is", $class_id, $student_school_id);
             $stmtFindStudent->execute();
             $res = $stmtFindStudent->get_result();
             
             if ($student = $res->fetch_assoc()) {
-                // Check if role is student
                 if ($student['role'] !== 'student') {
                     $errors[] = "User $student_school_id exists but is a {$student['role']}, not a student.";
                     continue;
                 }
 
                 $student_id = $student['id'];
-
-                if ($class_id > 0) {
-                    $stmtCheckEnrollment->bind_param("ii", $class_id, $student_id);
-                    $stmtCheckEnrollment->execute();
-                    if ($stmtCheckEnrollment->get_result()->num_rows === 0) {
-                        // Auto-Enroll
-                        $stmtEnroll->bind_param("ii", $class_id, $student_id);
-                        if ($stmtEnroll->execute()) {
-                            $autoEnrolled[] = $student_school_id;
-                        } else {
-                            $errors[] = "Failed to auto-enroll $student_school_id";
-                            continue;
-                        }
-                    }
+                
+                // Calculate Semestral Grade if Midterm and Final are available
+                $midterm = $student['midterm'];
+                $final = $student['final'];
+                
+                // Update current period value
+                if ($grading_period === 'midterm') $midterm = $transmuted_grade;
+                if ($grading_period === 'final') $final = $transmuted_grade;
+                
+                $semestral_grade = null;
+                if ($midterm > 0 && $final > 0) {
+                    $semestral_grade = ($midterm + $final) / 2;
                 }
 
-                $stmtUpsert->bind_param("issddssisi", $student_id, $subject_code, $subject_name, $transmuted_grade, $raw_grade, $final_remarks, $teacher_id, $section, $semester, $class_id);
+                // Auto-enroll removed
+
+                // If Semestral Grade is calculated, update it too
+                if ($semestral_grade !== null) {
+                     $stmtUpdateGrade = $conn->prepare("UPDATE grades SET grade = ? WHERE student_id = ? AND class_id = ?");
+                     $stmtUpdateGrade->bind_param("dii", $semestral_grade, $student_id, $class_id);
+                     $stmtUpdateGrade->execute();
+                }
+
+                $stmtUpsert->bind_param("issddssssi", $student_id, $subject_code, $subject_name, $transmuted_grade, $raw_grade, $final_remarks, $teacher_id, $section, $semester, $class_id);
                 
                 if ($stmtUpsert->execute()) {
                     if ($stmtUpsert->affected_rows === 1) {
@@ -193,83 +222,60 @@ if ($action === 'bulk_upload_grades') {
                     } else {
                         $updateCount++;
                     }
-                    // Add to notify list
-                    $studentsToNotify[] = [
-                        'email' => $student['email'],
-                        'name' => $student['full_name'],
-                        'subject' => $subject_code,
-                        'grade' => $transmuted_grade
-                    ];
                 } else {
                     $errors[] = "Error saving grade for $student_school_id";
                 }
                 
             } else {
-                // Ghost Student Logic
-                $ghost_email = "ghost_" . $student_school_id . "@kld.edu.ph";
-                $ghost_pass = password_hash("ghost", PASSWORD_DEFAULT);
-                $ghost_name = "Student " . $student_school_id; 
-                
-                $stmtCreateGhost->bind_param("ssss", $student_school_id, $ghost_name, $ghost_email, $ghost_pass);
-                
-                if ($stmtCreateGhost->execute()) {
-                    $student_id = $stmtCreateGhost->insert_id;
+                if ($create_ghosts) {
+                    $ghost_email = "ghost_" . $student_school_id . "@kld.edu.ph";
+                    $ghost_pass = password_hash("ghost", PASSWORD_DEFAULT);
+                    $ghost_name = "Student " . $student_school_id; 
                     
-                    // Auto-Enroll Ghost
-                    if ($class_id > 0) {
-                        $stmtEnroll->bind_param("ii", $class_id, $student_id);
-                        $stmtEnroll->execute();
+                    $stmtCreateGhost->bind_param("ssss", $student_school_id, $ghost_name, $ghost_email, $ghost_pass);
+                    
+                    if ($stmtCreateGhost->execute()) {
+                        $student_id = $stmtCreateGhost->insert_id;
+                        
+                        // Auto-enroll removed
+                        
+                         $stmtUpsert->bind_param("issddssssi", $student_id, $subject_code, $subject_name, $transmuted_grade, $raw_grade, $final_remarks, $teacher_id, $section, $semester, $class_id);
+                         if ($stmtUpsert->execute()) {
+                             $successCount++;
+                             $autoEnrolled[] = $student_school_id . " (Ghost)";
+                         }
+                    } else {
+                         $errors[] = "Failed to create ghost user for $student_school_id: " . $stmtCreateGhost->error;
                     }
-                    
-                    // Insert Grade
-                     $stmtUpsert->bind_param("issddssisi", $student_id, $subject_code, $subject_name, $transmuted_grade, $raw_grade, $final_remarks, $teacher_id, $section, $semester, $class_id);
-                     if ($stmtUpsert->execute()) {
-                         $successCount++;
-                         $autoEnrolled[] = $student_school_id . " (Ghost)";
-                     }
                 } else {
-                     $errors[] = "Failed to create ghost user for $student_school_id: " . $stmtCreateGhost->error;
+                    $notFound[] = $student_school_id;
+                    $errors[] = "Student $student_school_id not found (Ghost creation disabled)";
                 }
             }
         }
         
         $conn->commit();
-
-        // Send Emails (After commit to ensure data is saved)
-        foreach ($studentsToNotify as $s) {
-            $emailBody = "
-                <div style='font-family: Arial, sans-serif; padding: 20px; color: #333;'>
-                    <h2 style='color: #0D3B2E;'>Grade Update</h2>
-                    <p>Dear {$s['name']},</p>
-                    <p>A new grade has been posted for <strong>{$s['subject']}</strong>.</p>
-                    <p>Grade: <strong>{$s['grade']}</strong></p>
-                    <hr>
-                    <p>Please log in to the portal to view full details.</p>
-                </div>
-            ";
-            sendEmail($s['email'], "Grade Update: " . $s['subject'], $emailBody);
-        }
         
         echo json_encode([
             'success' => true,
             'inserted' => $successCount,
             'updated' => $updateCount,
+            'errors' => $errors,
             'not_found' => $notFound,
-            'auto_enrolled' => $autoEnrolled,
-            'errors' => $errors
+            'auto_enrolled' => $autoEnrolled
         ]);
-        
+
     } catch (Exception $e) {
-        $conn->rollback();
-        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+        if ($conn->in_transaction) {
+            $conn->rollback();
+        }
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
-    
     exit;
 }
 
 // Validate Students
 if ($action === 'validate_students') {
-    session_start();
     
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
         echo json_encode(['success' => false, 'message' => 'Unauthorized']);
@@ -309,7 +315,6 @@ if ($action === 'validate_students') {
                 $stmtCheckEnrollment->execute();
                 if ($stmtCheckEnrollment->get_result()->num_rows === 0) {
                     $not_enrolled[] = $school_id;
-                    continue;
                 }
             }
 
@@ -318,10 +323,17 @@ if ($action === 'validate_students') {
                 'name' => $row['full_name']
             ];
         } else {
-            $invalid[] = [
-                'school_id' => $school_id,
-                'error' => 'Not Found'
-            ];
+            if ($input['create_ghosts'] ?? false) {
+                 $valid[] = [
+                    'school_id' => $school_id,
+                    'status' => 'ghost_create'
+                ];
+            } else {
+                $invalid[] = [
+                    'school_id' => $school_id,
+                    'error' => 'Not Found'
+                ];
+            }
         }
     }
     
@@ -336,7 +348,6 @@ if ($action === 'validate_students') {
 
 // Create Class
 if ($action === 'create_class') {
-    session_start();
     if ($_SESSION['role'] !== 'teacher') {
         echo json_encode(['success' => false, 'message' => 'Unauthorized']);
         exit;
@@ -351,6 +362,12 @@ if ($action === 'create_class') {
     $schedule = trim($input['schedule'] ?? 'TBA');
     $program_id = !empty($input['program_id']) ? intval($input['program_id']) : null;
     $teacher_id = $_SESSION['user_id'];
+    $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($input['csrf_token'] ?? '');
+
+    if (!verify_csrf_token($csrf_token)) {
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF Token']);
+        exit;
+    }
 
     if (empty($subject_code) || empty($section)) {
         echo json_encode(['success' => false, 'message' => 'Subject Code and Section are required']);
@@ -383,7 +400,6 @@ if ($action === 'create_class') {
 }
 
 if ($action === 'edit_class') {
-    session_start();
     if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'teacher') {
         echo json_encode(['success' => false, 'message' => 'Unauthorized']);
         exit;
@@ -399,6 +415,12 @@ if ($action === 'edit_class') {
     $schedule = trim($input['schedule'] ?? 'TBA');
     $program_id = !empty($input['program_id']) ? intval($input['program_id']) : null;
     $teacher_id = $_SESSION['user_id'];
+    $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($input['csrf_token'] ?? '');
+
+    if (!verify_csrf_token($csrf_token)) {
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF Token']);
+        exit;
+    }
 
     if (empty($class_id) || empty($subject_code) || empty($section)) {
         echo json_encode(['success' => false, 'message' => 'Class ID, Subject Code and Section are required']);
@@ -432,7 +454,6 @@ if ($action === 'edit_class') {
 
 // Join Class
 if ($action === 'join_class') {
-    session_start();
     if ($_SESSION['role'] !== 'student') {
         echo json_encode(['success' => false, 'message' => 'Unauthorized']);
         exit;
@@ -441,13 +462,25 @@ if ($action === 'join_class') {
     $input = json_decode(file_get_contents('php://input'), true);
     $class_code = trim($input['class_code']);
     $student_id = $_SESSION['user_id'];
+    $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($input['csrf_token'] ?? '');
+
+    if (!verify_csrf_token($csrf_token)) {
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF Token']);
+        exit;
+    }
 
     if (empty($class_code)) {
         echo json_encode(['success' => false, 'message' => 'Class Code is required']);
         exit;
     }
 
-    $stmt = $conn->prepare("SELECT id, subject_code, section, program_id FROM classes WHERE class_code = ?");
+    // Get Class Info with Program Code
+    $stmt = $conn->prepare("
+        SELECT c.id, c.subject_code, c.section, c.program_id, p.code as program_code 
+        FROM classes c 
+        LEFT JOIN programs p ON c.program_id = p.id 
+        WHERE c.class_code = ?
+    ");
     $stmt->bind_param("s", $class_code);
     $stmt->execute();
     $res = $stmt->get_result();
@@ -455,17 +488,25 @@ if ($action === 'join_class') {
     if ($row = $res->fetch_assoc()) {
         $class_id = $row['id'];
         $class_section = $row['section'];
-        $class_program_id = $row['program_id'];
+        $class_program_code = $row['program_code'];
 
-        // Fetch Student Info
-        $stmtUser = $conn->prepare("SELECT section, program_id FROM users WHERE id = ?");
+        // Fetch Student Info with Program Code
+        $stmtUser = $conn->prepare("
+            SELECT u.section, u.program_id, p.code as program_code 
+            FROM users u 
+            LEFT JOIN programs p ON u.program_id = p.id 
+            WHERE u.id = ?
+        ");
         $stmtUser->bind_param("i", $student_id);
         $stmtUser->execute();
         $student = $stmtUser->get_result()->fetch_assoc();
 
         // Check Restrictions
-        if ($class_program_id && $class_program_id != $student['program_id']) {
-             // Fetch program name for better error message? For now generic.
+        // DEBUG LOGGING
+        file_put_contents('debug_log.txt', "Join Class Debug:\nClass ID: $class_id\nClass Program: $class_program_code\nStudent ID: $student_id\nStudent Program: {$student['program_code']}\n", FILE_APPEND);
+
+        // Compare CODES instead of IDs to handle duplicate program entries
+        if (!empty($class_program_code) && $class_program_code !== $student['program_code']) {
              echo json_encode(['success' => false, 'message' => 'You cannot join this class. Program restriction mismatch.']);
              exit;
         }
@@ -499,7 +540,6 @@ if ($action === 'join_class') {
 
 // Get Classes
 if ($action === 'get_classes') {
-    session_start();
     $user_id = $_SESSION['user_id'];
     $role = $_SESSION['role'];
     $data = [];
@@ -539,7 +579,6 @@ if ($action === 'get_classes') {
 
 // Get Class Students
 if ($action === 'get_class_students') {
-    session_start();
     $class_id = intval($_GET['class_id']);
     $teacher_id = $_SESSION['user_id'];
 
@@ -572,7 +611,6 @@ if ($action === 'get_class_students') {
 }
 
 if ($action === 'update_single_grade') {
-    session_start();
     if ($_SESSION['role'] !== 'teacher') {
         echo json_encode(['success' => false, 'message' => 'Unauthorized']);
         exit;
@@ -589,12 +627,16 @@ if ($action === 'update_single_grade') {
     }
     $remarks = trim($input['remarks']);
     $teacher_id = $_SESSION['user_id'];
+    $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($input['csrf_token'] ?? '');
+
+    if (!verify_csrf_token($csrf_token)) {
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF Token']);
+        exit;
+    }
 
     // Transmute
     list($transmuted_grade, $status_remarks) = transmuteGrade($raw_grade);
     
-    // If remarks is empty, use status remarks. If not, append or keep? 
-    // User might want to override remarks. Let's keep user remarks if provided, else status.
     if (empty($remarks)) {
         $remarks = $status_remarks;
     }

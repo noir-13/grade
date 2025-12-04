@@ -1,18 +1,42 @@
 <?php
 // Configuration File
-// Ideally, this file should be outside the web root or protected.
+// Loads environment variables from .env file
 
-// Database Credentials
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'kld_grading_system');
+$envFile = __DIR__ . '/.env';
 
-// Email Credentials (SMTP)
-define('SMTP_HOST', 'smtp.gmail.com');
-define('SMTP_PORT', 587);
-define('SMTP_USER', 'kevinselibio10@gmail.com');
-define('SMTP_PASS', 'ruxmlcupgdicyywc'); // App Password
-define('SMTP_FROM_EMAIL', 'kevinselibio10@gmail.com');
-define('SMTP_FROM_NAME', 'KLD Grade System');
+if (file_exists($envFile)) {
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        // Skip comments
+        if (strpos(trim($line), '#') === 0) continue;
+        
+        // Parse KEY=VALUE
+        if (strpos($line, '=') !== false) {
+            list($name, $value) = explode('=', $line, 2);
+            $name = trim($name);
+            $value = trim($value);
+            
+            // Remove quotes if present
+            $value = trim($value, '"\'');
+            
+            if (!defined($name)) {
+                define($name, $value);
+            }
+        }
+    }
+}
+
+// Fallback / Defaults (Optional: can be removed if strict .env usage is desired)
+defined('DB_HOST') or define('DB_HOST', 'localhost');
+defined('DB_USER') or define('DB_USER', 'root');
+defined('DB_PASS') or define('DB_PASS', '');
+defined('DB_NAME') or define('DB_NAME', 'kld_grading_system');
+
+defined('SMTP_HOST') or define('SMTP_HOST', 'smtp.gmail.com');
+defined('SMTP_PORT') or define('SMTP_PORT', 587);
+// No default for sensitive credentials to ensure .env is used
+defined('SMTP_USER') or define('SMTP_USER', '');
+defined('SMTP_PASS') or define('SMTP_PASS', '');
+defined('SMTP_FROM_EMAIL') or define('SMTP_FROM_EMAIL', '');
+defined('SMTP_FROM_NAME') or define('SMTP_FROM_NAME', 'KLD Grade System');
 ?>

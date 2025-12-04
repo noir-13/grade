@@ -12,6 +12,7 @@ require 'check_profile.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Classes | KLD Grade System</title>
+    <meta name="csrf-token" content="<?php echo $_SESSION['csrf_token']; ?>">
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="verdantDesignSystem.css">
@@ -163,6 +164,10 @@ require 'check_profile.php';
             e.preventDefault();
             const formData = new FormData(e.target);
             const payload = Object.fromEntries(formData.entries());
+            
+            // Add CSRF Token
+            payload.csrf_token = document.querySelector('meta[name="csrf-token"]').content;
+
             const btn = e.target.querySelector('button[type="submit"]');
             
             btn.disabled = true;

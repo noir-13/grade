@@ -20,6 +20,14 @@ if (!$class) {
     echo "Class not found or unauthorized.";
     exit();
 }
+// Fetch Programs
+$programs = [];
+$progStmt = $conn->prepare("SELECT * FROM programs ORDER BY code ASC");
+$progStmt->execute();
+$progRes = $progStmt->get_result();
+while ($row = $progRes->fetch_assoc()) {
+    $programs[] = $row;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -132,7 +140,19 @@ if (!$class) {
                 <div class="modal-body p-4 pt-0">
                     <form id="editClassForm">
                         <input type="hidden" name="class_id" value="<?php echo $class_id; ?>">
-                        <input type="hidden" name="program_id" value="<?php echo htmlspecialchars($class['program_id'] ?? ''); ?>">
+                        
+                        <div class="vds-form-group">
+                            <label class="vds-label">Program Restriction <span class="text-danger">*</span></label>
+                            <select name="program_id" class="vds-select" required>
+                                <option value="">Select Program</option>
+                                <?php foreach ($programs as $prog): ?>
+                                    <option value="<?php echo $prog['id']; ?>" <?php echo ($class['program_id'] == $prog['id']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($prog['code'] . ' - ' . $prog['name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted" style="font-size: 0.8rem;">Only students from this program can enroll.</small>
+                        </div>
                         <div class="vds-form-group">
                             <label class="vds-label">Subject Code <span class="text-danger">*</span></label>
                             <input type="text" name="subject_code" class="vds-input" value="<?php echo htmlspecialchars($class['subject_code']); ?>" maxlength="50" required>

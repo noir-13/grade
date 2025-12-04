@@ -93,16 +93,44 @@ if ($role === 'teacher' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST
             // Send Email Notifications
             if (!empty($recipients_list)) {
                 $emailBody = "
-                    <div style='font-family: Arial, sans-serif; padding: 20px; color: #333;'>
-                        <h2 style='color: #0D3B2E;'>New Announcement</h2>
-                        <p>Dear Student,</p>
-                        <p>A new announcement has been posted for your class.</p>
-                        <hr>
-                        <h3>$title</h3>
-                        <p>$content</p>
-                        <hr>
-                        <p>Please log in to the portal for more details.</p>
-                    </div>
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <style>
+                            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+                            .container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+                            .header { background-color: #0D3B2E; color: #ffffff; padding: 20px; text-align: center; }
+                            .header h1 { margin: 0; font-size: 24px; }
+                            .content { padding: 30px; }
+                            .announcement-title { color: #0D3B2E; font-size: 20px; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+                            .announcement-text { font-size: 16px; color: #555; white-space: pre-wrap; }
+                            .footer { background-color: #f9f9f9; padding: 15px; text-align: center; font-size: 12px; color: #888; border-top: 1px solid #eee; }
+                            .btn { display: inline-block; padding: 10px 20px; background-color: #0D3B2E; color: #ffffff; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class='container'>
+                            <div class='header'>
+                                <h1>KLD Grade System</h1>
+                            </div>
+                            <div class='content'>
+                                <p>Dear Student,</p>
+                                <p>A new announcement has been posted for your class.</p>
+                                
+                                <h2 class='announcement-title'>$title</h2>
+                                <div class='announcement-text'>$content</div>
+                                
+                                <center>
+                                    <a href='http://localhost/grade/login.php' class='btn'>Log in to Portal</a>
+                                </center>
+                            </div>
+                            <div class='footer'>
+                                <p>&copy; " . date('Y') . " KLD Grade System. All rights reserved.</p>
+                                <p>This is an automated message, please do not reply.</p>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
                 ";
                 // Send batch email
                 sendEmailBCC($recipients_list, "New Announcement: $title", $emailBody);

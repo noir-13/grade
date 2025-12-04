@@ -12,6 +12,7 @@ require 'check_profile.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Classes | KLD Grade System</title>
+    <meta name="csrf-token" content="<?php echo $_SESSION['csrf_token']; ?>">
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="verdantDesignSystem.css">
@@ -338,7 +339,10 @@ require 'check_profile.php';
                 const res = await fetch('api.php?action=create_class', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({
+                        ...payload,
+                        csrf_token: document.querySelector('meta[name="csrf-token"]').content
+                    })
                 });
                 const data = await res.json();
 
@@ -355,6 +359,43 @@ require 'check_profile.php';
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = 'Create Class';
+            }
+        });
+
+        // Edit Class
+        editClassForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const payload = Object.fromEntries(formData.entries());
+            const btn = e.target.querySelector('button[type="submit"]');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+            try {
+                const res = await fetch('api.php?action=edit_class', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...payload,
+                        csrf_token: document.querySelector('meta[name="csrf-token"]').content
+                    })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    editClassModal.hide();
+                    editClassForm.reset();
+                    loadClasses();
+                    alert('Class Updated!');
+                } else {
+                    alert(data.message);
+                }
+            } catch (err) {
+                alert('Error updating class');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Save Changes';
             }
         });
 

@@ -1,6 +1,7 @@
 <?php
 session_start();
 require 'db_connect.php';
+require 'csrf_helper.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
@@ -12,13 +13,21 @@ $message = '';
 $messageType = '';
 
 // Fetch user data
-$stmt = $conn->prepare("SELECT full_name, email, role, phone_number, is_profile_complete, section FROM users WHERE id = ?");
+$stmt = $conn->prepare("
+    SELECT u.full_name, u.email, u.role, u.phone_number, u.is_profile_complete, u.section, p.code as program_code, p.name as program_name 
+    FROM users u 
+    LEFT JOIN programs p ON u.program_id = p.id 
+    WHERE u.id = ?
+");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $user = $stmt->get_result()->fetch_assoc();
 
 // Handle Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+        die("Invalid CSRF Token");
+    }
     $section = trim($_POST['section'] ?? '');
     
     if ($user['role'] === 'student' && !empty($section) && preg_match('/[^a-zA-Z0-9]/', $section)) {
@@ -68,7 +77,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         <?php endif; ?>
 
-        <form method="POST">
+        <form method="POST" id="profileForm">
+            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
             <div class="mb-3">
                 <label class="vds-label">Full Name</label>
                 <input type="text" class="vds-input" value="<?php echo htmlspecialchars($user['full_name']); ?>" disabled>
@@ -77,20 +87,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label class="vds-label">Email Address</label>
                 <input type="email" class="vds-input" value="<?php echo htmlspecialchars($user['email']); ?>" disabled>
             </div>
+
+            <?php if ($user['role'] === 'student' && !empty($user['program_code'])): ?>
+            <div class="mb-3">
+                <label class="vds-label">Program</label>
+                <input type="text" class="vds-input" value="<?php echo htmlspecialchars($user['program_code'] . ' - ' . $user['program_name']); ?>" disabled>
+            </div>
+            <?php endif; ?>
             
             <?php if ($user['role'] === 'student'): ?>
             <div class="mb-4">
                 <label class="vds-label">Section</label>
-                <input type="text" name="section" class="vds-input" placeholder="e.g. 209" value="<?php echo htmlspecialchars($user['section'] ?? ''); ?>">
+                <input type="text" name="section" id="sectionInput" class="vds-input" placeholder="e.g. 209" value="<?php echo htmlspecialchars($user['section'] ?? ''); ?>">
+                <div id="sectionFeedback" class="invalid-feedback">
+                    Section must be alphanumeric (e.g., 209, A, B1).
+                </div>
             </div>
             <?php endif; ?>
 
-            <button type="submit" class="vds-btn vds-btn-primary w-100">
+            <button type="submit" class="vds-btn vds-btn-primary w-100" id="saveBtn">
                 Save & Continue <i class="bi bi-arrow-right ms-2"></i>
             </button>
         </form>
     </div>
 
     <script src="js/bootstrap.bundle.min.js"></script>
+    <script>
+        const sectionInput = document.getElementById('sectionInput');
+        const sectionFeedback = document.getElementById('sectionFeedback');
+        const saveBtn = document.getElementById('saveBtn');
+
+        if (sectionInput) {
+            sectionInput.addEventListener('input', function() {
+                const val = this.value.trim();
+                const isValid = /^[a-zA-Z0-9]*$/.test(val);
+                
+                if (!isValid) {
+                    this.classList.add('is-invalid');
+                    sectionFeedback.style.display = 'block';
+                    saveBtn.disabled = true;
+                } else {
+                    this.classList.remove('is-invalid');
+                    sectionFeedback.style.display = 'none';
+                    saveBtn.disabled = false;
+                }
+            });
+        }
+    </script>
 </body>
 </html>

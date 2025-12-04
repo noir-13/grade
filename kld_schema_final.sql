@@ -1,5 +1,5 @@
-CREATE DATABASE IF NOT EXISTS kld_grading_system;
-USE kld_grading_system;
+CREATE DATABASE IF NOT EXISTS gradingSystem;
+USE gradingSystem;
 
 -- 1. INSTITUTES: The top-level colleges
 CREATE TABLE IF NOT EXISTS institutes (
@@ -46,13 +46,79 @@ CREATE TABLE IF NOT EXISTS verification_codes (
 -- 5. GRADES: The academic records
 CREATE TABLE IF NOT EXISTS grades (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    student_school_id VARCHAR(50) NOT NULL, -- Links to users.school_id
-    subject_code VARCHAR(50) NOT NULL, -- e.g., CC101
-    grade DECIMAL(5,2) NOT NULL, -- e.g., 1.75
+    student_id INT NOT NULL, -- Changed from student_school_id to student_id (FK)
+    subject_code VARCHAR(50) NOT NULL,
+    subject_name VARCHAR(100) DEFAULT NULL,
+    grade DECIMAL(5,2) DEFAULT NULL, -- Transmuted
+    raw_grade DECIMAL(5,2) DEFAULT NULL,
+    midterm DECIMAL(5,2) DEFAULT NULL,
+    final DECIMAL(5,2) DEFAULT NULL,
+    remarks VARCHAR(255) DEFAULT NULL,
     teacher_id INT NOT NULL,
+    section VARCHAR(50) DEFAULT NULL,
     semester VARCHAR(50) DEFAULT '1st Sem 2024-2025',
+    class_id INT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (teacher_id) REFERENCES users(id)
+    FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (teacher_id) REFERENCES users(id),
+    FOREIGN KEY (class_id) REFERENCES classes(id)
+);
+
+-- 6. CLASSES: Managed by Teachers
+CREATE TABLE IF NOT EXISTS classes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    teacher_id INT NOT NULL,
+    subject_code VARCHAR(50) NOT NULL,
+    subject_description VARCHAR(255),
+    section VARCHAR(50) NOT NULL,
+    class_code VARCHAR(10) NOT NULL UNIQUE, -- For students to join
+    semester VARCHAR(50) DEFAULT '1st Sem 2024-2025',
+    units INT DEFAULT 3,
+    schedule VARCHAR(100),
+    program_id INT DEFAULT NULL, -- Restriction
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (teacher_id) REFERENCES users(id),
+    FOREIGN KEY (program_id) REFERENCES programs(id)
+);
+
+-- 7. ENROLLMENTS: Students joining classes
+CREATE TABLE IF NOT EXISTS enrollments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    class_id INT NOT NULL,
+    student_id INT NOT NULL,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_enrollment (class_id, student_id)
+);
+
+-- 8. ANNOUNCEMENTS
+CREATE TABLE IF NOT EXISTS announcements (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    author_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (author_id) REFERENCES users(id)
+);
+
+-- 9. ANNOUNCEMENT RECIPIENTS (Targeting)
+CREATE TABLE IF NOT EXISTS announcement_recipients (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    announcement_id INT NOT NULL,
+    recipient_group ENUM('all', 'teachers', 'students', 'program', 'institute') NOT NULL,
+    target_id INT DEFAULT NULL, -- program_id or institute_id if applicable
+    FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE
+);
+
+-- 10. ANNOUNCEMENT READS (Tracking)
+CREATE TABLE IF NOT EXISTS announcement_reads (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    announcement_id INT NOT NULL,
+    user_id INT NOT NULL,
+    read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- --- SEED DATA (KLD CONFIGURATION) ---
